@@ -1,0 +1,23 @@
+/**
+ * Custom CSS for the docs site.
+ * You can override CSS variables here to match the project's branding.
+ */
+:root {
+  --vp-c-brand-1: #629fd0;
+  --vp-c-brand-2: #3881bc;
+  --vp-c-brand-3: #204b6f;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    349deg,
+    rgba(32, 32, 48, 1) 0%,
+    rgba(32, 75, 111, 1) 20%,
+    rgba(98, 159, 208, 1) 100%
+  );
+}
+
+.dark {
+  --vp-c-bg: #202030;
+  --vp-c-bg-soft: #29293d;
+  --vp-sidebar-bg-color: #101018;
+}

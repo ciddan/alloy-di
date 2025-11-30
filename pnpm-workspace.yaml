@@ -1,0 +1,10 @@
+packages:
+  - docs
+  - packages/alloy
+  - packages/examples/*
+
+minimumReleaseAge: 1440
+
+onlyBuiltDependencies:
+  - esbuild
+  - simple-git-hooks

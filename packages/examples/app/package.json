@@ -1,0 +1,31 @@
+{
+  "name": "@alloy-di/example-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "format": "prettier -u --write ./",
+    "format:check": "prettier -u --check ./",
+    "lint": "oxlint --fix --type-aware --config ./.oxlintrc.json .",
+    "lint:check": "oxlint --type-aware --config ./.oxlintrc.json .",
+    "preview": "vite preview",
+    "test": "echo No tests",
+    "test:cover": "echo No tests",
+    "typecheck": "tsc -b . --noEmit"
+  },
+  "dependencies": {
+    "@alloy-di/example-library-internal": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "alloy-di": "workspace:*",
+    "@alloy-di/example-library-external": "workspace:*",
+    "@vitejs/plugin-react": "^5.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sass": "^1.81.0"
+  }
+}

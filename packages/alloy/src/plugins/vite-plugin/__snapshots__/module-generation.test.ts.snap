@@ -1,0 +1,230 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a class with a lazy dependency 1`] = `
+"
+
+import { Container, dependenciesRegistry, Lazy, registerServiceIdentifier } from 'alloy-di/runtime';
+import { ServiceD } from '/src/service-d.ts';
+
+
+const registrations = [
+  { ctor: ServiceD, meta: { dependencies: () => [Lazy(() => import('/src/dep-a'))] } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const ServiceDIdentifier = registerServiceIdentifier(ServiceD, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-d.ts#ServiceD'));
+
+export const serviceIdentifiers = {
+  'ServiceD': ServiceDIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a class with dependencies 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { DepA } from '/src/dep-a';
+import { DepB } from '/src/dep-b';
+import { ServiceC } from '/src/service-c.ts';
+
+
+const registrations = [
+  { ctor: ServiceC, meta: { dependencies: () => [DepA, DepB] } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const ServiceCIdentifier = registerServiceIdentifier(ServiceC, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-c.ts#ServiceC'));
+
+export const serviceIdentifiers = {
+  'ServiceC': ServiceCIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a class with no dependencies 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { ServiceA } from '/src/service-a.ts';
+
+
+const registrations = [
+  { ctor: ServiceA, meta: {} }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const ServiceAIdentifier = registerServiceIdentifier(ServiceA, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-a.ts#ServiceA'));
+
+export const serviceIdentifiers = {
+  'ServiceA': ServiceAIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a double quoted singleton class 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { SingletonServiceDouble } from '/src/singleton-service-double.ts';
+
+
+const registrations = [
+  { ctor: SingletonServiceDouble, meta: { scope: 'singleton' } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const SingletonServiceDoubleIdentifier = registerServiceIdentifier(SingletonServiceDouble, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/singleton-service-double.ts#SingletonServiceDouble'));
+
+export const serviceIdentifiers = {
+  'SingletonServiceDouble': SingletonServiceDoubleIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a singleton class 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { SingletonService } from '/src/singleton-service.ts';
+
+
+const registrations = [
+  { ctor: SingletonService, meta: { scope: 'singleton' } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const SingletonServiceIdentifier = registerServiceIdentifier(SingletonService, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/singleton-service.ts#SingletonService'));
+
+export const serviceIdentifiers = {
+  'SingletonService': SingletonServiceIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates a module for a singleton class via shorthand 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { ShSingleton } from '/src/sh-singleton.ts';
+
+
+const registrations = [
+  { ctor: ShSingleton, meta: { scope: 'singleton' } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const ShSingletonIdentifier = registerServiceIdentifier(ShSingleton, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/sh-singleton.ts#ShSingleton'));
+
+export const serviceIdentifiers = {
+  'ShSingleton': ShSingletonIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > generates an empty module if no services are found 1`] = `
+"
+
+import { Container, dependenciesRegistry } from 'alloy-di/runtime';
+
+
+const registrations = [];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+export const serviceIdentifiers = {};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > normalizes backslash paths to posix style 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { WinPathService } from '/src/nested/win-path-service.ts';
+
+
+const registrations = [
+  { ctor: WinPathService, meta: {} }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const WinPathServiceIdentifier = registerServiceIdentifier(WinPathService, Symbol.for('alloy:UNKNOWN_PACKAGE/src\\nested\\win-path-service.ts#WinPathService'));
+
+export const serviceIdentifiers = {
+  'WinPathService': WinPathServiceIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - module generation > processes an Injectable class in a .tsx file 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { UiComponent } from '/src/ui-component.tsx';
+
+
+const registrations = [
+  { ctor: UiComponent, meta: { scope: 'singleton' } }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const UiComponentIdentifier = registerServiceIdentifier(UiComponent, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/ui-component.tsx#UiComponent'));
+
+export const serviceIdentifiers = {
+  'UiComponent': UiComponentIdentifier
+};
+
+export default container;
+"
+`;

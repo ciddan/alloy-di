@@ -1,0 +1,38 @@
+{
+  "name": "alloy-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.22.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "docs:build": "pnpm --filter @alloy-di/docs build",
+    "docs:dev": "pnpm --filter @alloy-di/docs dev",
+    "docs:preview": "pnpm --filter @alloy-di/docs preview",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "lint": "turbo lint",
+    "lint:check": "turbo lint:check",
+    "prepare": "simple-git-hooks",
+    "test": "turbo test",
+    "test:cover": "turbo test:cover",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.0.14",
+    "lint-staged": "^16.2.6",
+    "oxlint": "^1.28.0",
+    "oxlint-tsgolint": "^0.8.1",
+    "prettier": "^3.7.2",
+    "rollup-plugin-visualizer": "^6.0.5",
+    "simple-git-hooks": "^2.13.1",
+    "turbo": "^2.6.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vitest": "^4.0.14"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  }
+}

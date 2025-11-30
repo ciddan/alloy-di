@@ -1,0 +1,12 @@
+{
+  "name": "@upn/fixture-lib",
+  "version": "0.0.0-test",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./analytics-service": "./analytics-service.js",
+    "./event-tracker": "./event-tracker.js",
+    "./user-session": "./user-session.js",
+    "./manifest": "./alloy.manifest.mjs"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "extends": ["oxlint:defaults"],
+  "rules": {
+    "block-scoped-var": "error",
+    "consistent-function-scoping": "error",
+    "curly": ["error", "all"],
+    "no-absolute-path": "error",
+    "no-accessor-recursion": "error",
+    "no-array-reverse": "error",
+    "no-array-sort": "error",
+    "no-commented-out-tests": "error",
+    "no-confusing-non-null-assertion": "error",
+    "no-empty-named-blocks": "error",
+    "no-empty-object-type": "error",
+    "no-explicit-any": "error",
+    "no-extend-native": "error",
+    "no-extra-bind": "error",
+    "no-extraneous-class": "error",
+    "no-instanceof-builtins": "error",
+    "no-named-as-default-member": "error",
+    "no-named-as-default": "error",
+    "no-namespace": "error",
+    "no-new": "error",
+    "no-non-null-assertion": "error",
+    "no-require-imports": "error",
+    "no-self-import": "error",
+    "no-unassigned-import": "error",
+    "no-unexpected-multiline": "error",
+    "no-unnecessary-boolean-literal-compare": "error",
+    "no-unnecessary-template-expression": "error",
+    "no-unnecessary-type-arguments": "error",
+    "no-unnecessary-type-assertion": "error",
+    "no-unnecessary-type-constraint": "error",
+    "no-unneeded-ternary": "error",
+    "no-unsafe-enum-comparison": "error",
+    "no-unsafe-type-assertion": "error",
+    "no-useless-concat": "error",
+    "no-useless-constructor": "error",
+    "no-var-requires": "error",
+    "prefer-add-event-listener": "error",
+    "prefer-literal-enum-member": "error",
+    "preserve-caught-error": "error",
+    "require-module-specifiers": "error",
+    "require-post-message-target-origin": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "no-extraneous-class": "off",
+        "no-unsafe-type-assertion": "off",
+        "no-explicit-any": "off"
+      }
+    }
+  ]
+}

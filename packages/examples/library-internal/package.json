@@ -1,0 +1,79 @@
+{
+  "name": "@alloy-di/example-library-internal",
+  "version": "0.0.1",
+  "description": "Example internal library demonstrating direct Alloy decorator usage in monorepo packages",
+  "private": true,
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "rimraf dist && rolldown -c",
+    "dev": "rolldown -c rolldown.config.ts --watch",
+    "format": "prettier -u --write ./",
+    "format:check": "prettier -u --check ./",
+    "lint": "oxlint --fix --type-aware --config ./.oxlintrc.json .",
+    "lint:check": "oxlint --type-aware --config ./.oxlintrc.json .",
+    "test": "vitest --run",
+    "test:cover": "vitest --run --coverage",
+    "typecheck": "tsc -b . --noEmit"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./analytics-service": {
+      "types": "./dist/analytics-service.d.ts",
+      "import": "./dist/analytics-service.js"
+    },
+    "./event-tracker": {
+      "types": "./dist/event-tracker.d.ts",
+      "import": "./dist/event-tracker.js"
+    },
+    "./user-session": {
+      "types": "./dist/user-session.d.ts",
+      "import": "./dist/user-session.js"
+    },
+    "./reporting-service": {
+      "types": "./dist/reporting-service.d.ts",
+      "import": "./dist/reporting-service.js"
+    },
+    "./heavy-processor": {
+      "types": "./dist/heavy-processor.d.ts",
+      "import": "./dist/heavy-processor.js"
+    },
+    "./providers": {
+      "types": "./dist/providers.d.ts",
+      "import": "./dist/providers.js"
+    },
+    "./manifest": {
+      "import": "./dist/alloy.manifest.mjs"
+    },
+    "./service-identifiers": {
+      "import": "./dist/service-identifiers.mjs"
+    }
+  },
+  "keywords": [
+    "analytics",
+    "di",
+    "dependency-injection",
+    "example",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@10.22.0",
+  "files": [
+    "dist"
+  ],
+  "devDependencies": {
+    "rimraf": "^6.1.0",
+    "rolldown": "1.0.0-beta.52",
+    "rolldown-plugin-dts": "^0.18.1",
+    "vitest": "^4.0.14"
+  },
+  "dependencies": {
+    "alloy-di": "workspace:*",
+    "tslib": "^2.8.1"
+  }
+}

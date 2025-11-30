@@ -1,0 +1,46 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Vite Plugin Alloy - lifecycle & HMR > should remove class after decorator deletion on re-transform 1`] = `
+"
+
+import { Container, dependenciesRegistry, registerServiceIdentifier } from 'alloy-di/runtime';
+import { TempService } from '/src/hmr-remove.ts';
+
+
+const registrations = [
+  { ctor: TempService, meta: {} }
+];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+const TempServiceIdentifier = registerServiceIdentifier(TempService, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/hmr-remove.ts#TempService'));
+
+export const serviceIdentifiers = {
+  'TempService': TempServiceIdentifier
+};
+
+export default container;
+"
+`;
+
+exports[`Vite Plugin Alloy - lifecycle & HMR > should remove class after decorator deletion on re-transform 2`] = `
+"
+
+import { Container, dependenciesRegistry } from 'alloy-di/runtime';
+
+
+const registrations = [];
+
+const container = new Container();
+
+for (const entry of registrations) {
+  dependenciesRegistry.set(entry.ctor, entry.meta);
+}
+export const serviceIdentifiers = {};
+
+export default container;
+"
+`;
