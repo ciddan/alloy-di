@@ -50,6 +50,8 @@ pnpm add -D alloy-di
    const app = await container.get(serviceIdentifiers.AppService);
    ```
 
+> **Build tip:** The default Vite scaffold (`pnpm create vite@latest`) wires `"build": "tsc && vite build"`. Alloy writes its ambient declarations during `vite build`, so running `tsc` first can fail on fresh trees. Swap the order (`vite build && tsc`), or manually run `vite build` to generate the declarations first.
+
 Need manifests, providers, or testing utilities? See the docs site for complete guides.
 
 ## Documentation

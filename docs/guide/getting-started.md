@@ -24,6 +24,9 @@ export default defineConfig({
 
 > **Note:** The Alloy plugin generates type definition files (`alloy-container.d.ts` and `alloy-manifests.d.ts`) in your source directory (default: `./src`). Add these to your `.gitignore`.
 
+> [!TIP]
+> The default Vite scaffold (`pnpm create vite@latest`) wires `"build": "tsc && vite build"`. Alloy writes its ambient declarations during `vite build`, so running `tsc` first can fail on fresh trees. Swap the order (`vite build && tsc`), or manually run `vite build` to generate the declarations first.
+
 ### 2. Declare Services
 
 Use decorators from `alloy-di/runtime`.
