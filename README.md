@@ -22,8 +22,8 @@ A compile-time dependency injection (DI) system purpose-built for the Vite ecosy
 First, clone the repository and install dependencies using pnpm:
 
 ```bash
-git clone git@gitlab-ncsa.ubisoft.org:connect/public-libraries/alloy.git
-cd alloy
+git clone git@github.com:ciddan/alloy-di.git
+cd alloy-di
 pnpm install
 ```
 
