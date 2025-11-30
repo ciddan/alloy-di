@@ -18,7 +18,7 @@ export default defineConfig({
       { text: "Config", link: "/config/" },
       {
         text: "Examples",
-        link: "https://github.com/upn/alloy/tree/main/packages/examples",
+        link: "https://github.com/ciddan/alloy-di/tree/main/packages/examples",
       },
     ],
 
@@ -58,6 +58,8 @@ export default defineConfig({
       },
     ],
 
-    socialLinks: [{ icon: "github", link: "https://github.com/upn/alloy" }],
+    socialLinks: [
+      { icon: "github", link: "https://github.com/ciddan/alloy-di" },
+    ],
   },
 });

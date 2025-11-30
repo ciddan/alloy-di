@@ -17,7 +17,7 @@ hero:
       link: /guide/what-is-alloy
     - theme: alt
       text: View on GitHub
-      link: https://github.com/upn/alloy
+      link: https://github.com/ciddan/alloy-di
 
 features:
   - title: Compile-time Resolution
