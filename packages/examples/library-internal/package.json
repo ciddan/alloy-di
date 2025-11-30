@@ -1,6 +1,6 @@
 {
   "name": "@alloy-di/example-library-internal",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Example internal library demonstrating direct Alloy decorator usage in monorepo packages",
   "private": true,
   "module": "./dist/index.js",
