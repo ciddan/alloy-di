@@ -45,7 +45,8 @@
   "author": "Mikael Selander",
   "license": "MIT",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "devDependencies": {
     "@rollup/plugin-typescript": "^12.3.0",

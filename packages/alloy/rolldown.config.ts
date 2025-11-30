@@ -39,7 +39,8 @@ export default defineConfig([
       dir: "dist",
       format: "es",
       entryFileNames: "[name].js",
-      sourcemap: true,
+      preserveModules: true,
+      sourcemap: false,
     },
     external,
     plugins: [
