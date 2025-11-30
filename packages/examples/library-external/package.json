@@ -36,8 +36,8 @@
     "dependency-injection",
     "example"
   ],
-  "author": "",
-  "license": "UNLICENSED",
+  "author": "Mikael Selander",
+  "license": "MIT",
   "packageManager": "pnpm@10.22.0",
   "files": [
     "dist"
