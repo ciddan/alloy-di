@@ -6,6 +6,8 @@
 /_/  |_/_____/_____/\____/ /_/ 
 ```
 
+Please visit [alloy-di.dev](https://alloy-di.dev) for full documentation.
+
 # Alloy Monorepo
 
 A compile-time dependency injection (DI) system purpose-built for the Vite ecosystem. This monorepo contains:
