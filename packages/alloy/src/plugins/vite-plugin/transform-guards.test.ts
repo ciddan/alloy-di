@@ -23,7 +23,7 @@ describe("transform guards", () => {
     const res = plugin.transform("code", "/node_modules/otherpkg/a.ts");
     expect(res).toBeNull();
     // @ts-expect-error testing transform
-    const res2 = plugin.transform("code", "/node_modules/@upn/lib/a.ts");
+    const res2 = plugin.transform("code", "/node_modules/@acme/lib/a.ts");
     expect(res2).toBeNull();
   });
 });

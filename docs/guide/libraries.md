@@ -85,7 +85,7 @@ Alloy supports internal libraries via an ESM manifest (`alloy.manifest.mjs`) pro
 4. Build the library. This emits `dist/alloy.manifest.mjs` alongside JS output.
 
    ```zsh
-   pnpm --filter @upn/my-lib run build
+   pnpm --filter @acme/my-lib run build
    ```
 
 ## App Setup (Consume Manifest)
@@ -96,7 +96,7 @@ Alloy supports internal libraries via an ESM manifest (`alloy.manifest.mjs`) pro
    // packages/app/vite.config.ts
    import { defineConfig } from "vite";
    import { alloy } from "alloy-di/vite";
-   import { manifest } from "@upn/my-lib/manifest";
+   import { manifest } from "@acme/my-lib/manifest";
 
    export default defineConfig({
      plugins: [
@@ -113,7 +113,7 @@ Alloy supports internal libraries via an ESM manifest (`alloy.manifest.mjs`) pro
    ```ts
    // packages/app/src/analytics-consumer.ts
    import { Injectable, deps } from "alloy-di/runtime";
-   import { EventTracker, AnalyticsService } from "@upn/my-lib";
+   import { EventTracker, AnalyticsService } from "@acme/my-lib";
 
    @Injectable(deps(EventTracker, AnalyticsService))
    export class AnalyticsConsumer {
@@ -131,8 +131,8 @@ Alloy supports internal libraries via an ESM manifest (`alloy.manifest.mjs`) pro
 
 ## Build Modes & Import Paths
 
-- Bundled (default): services import from the package root (e.g., `@upn/my-lib`). Ensure named exports in `src/index.ts`.
-- Preserve Modules: services import from subpaths (e.g., `@upn/my-lib/event-tracker`). Improves tree-shaking.
+- Bundled (default): services import from the package root (e.g., `@acme/my-lib`). Ensure named exports in `src/index.ts`.
+- Preserve Modules: services import from subpaths (e.g., `@acme/my-lib/event-tracker`). Improves tree-shaking.
 
 The manifest plugin detects the build mode and emits corresponding `importPath` values. Diagnostics include a `missingExports` list when bundled and symbols aren’t exported from the barrel.
 
@@ -143,9 +143,11 @@ Use `Lazy(() => import('...').then(m => m.Export))` for lazy deps. The manifest 
 ```ts
 import { Injectable, Lazy, deps } from "alloy-di/runtime";
 
-@Injectable(deps(Lazy(() => import("@upn/my-lib").then((m) => m.EventTracker))))
+@Injectable(
+  deps(Lazy(() => import("@acme/my-lib").then((m) => m.EventTracker))),
+)
 export class UsesLazy {
-  constructor(private t: import("@upn/my-lib").EventTracker) {}
+  constructor(private t: import("@acme/my-lib").EventTracker) {}
 }
 ```
 
@@ -182,7 +184,7 @@ export class UsesLazy {
 
   ```json
   {
-    "name": "@upn/my-lib",
+    "name": "@acme/my-lib",
     "alloy": { "manifest": "./dist/alloy.manifest.mjs" }
   }
   ```

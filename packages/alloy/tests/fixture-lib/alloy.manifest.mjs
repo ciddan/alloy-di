@@ -1,14 +1,14 @@
 // Fixture manifest (chunks mode)
 export const manifest = {
   schemaVersion: 1,
-  packageName: "@upn/fixture-lib",
+  packageName: "@acme/fixture-lib",
   buildMode: "chunks",
   services: [
     {
       exportName: "AnalyticsService",
-      importPath: "@upn/fixture-lib/analytics-service",
+      importPath: "@acme/fixture-lib/analytics-service",
       symbolKey:
-        "alloy:@upn/fixture-lib/src/analytics-service.ts#AnalyticsService",
+        "alloy:@acme/fixture-lib/src/analytics-service.ts#AnalyticsService",
       scope: "singleton",
       deps: [],
       lazyDeps: [],
@@ -16,22 +16,22 @@ export const manifest = {
     },
     {
       exportName: "EventTracker",
-      importPath: "@upn/fixture-lib/event-tracker",
-      symbolKey: "alloy:@upn/fixture-lib/src/event-tracker.ts#EventTracker",
+      importPath: "@acme/fixture-lib/event-tracker",
+      symbolKey: "alloy:@acme/fixture-lib/src/event-tracker.ts#EventTracker",
       scope: "transient",
       deps: [],
       lazyDeps: [
         {
           exportName: "AnalyticsService",
-          importPath: "@upn/fixture-lib/analytics-service",
+          importPath: "@acme/fixture-lib/analytics-service",
         },
       ],
       source: "src/event-tracker.ts",
     },
     {
       exportName: "UserSession",
-      importPath: "@upn/fixture-lib/user-session",
-      symbolKey: "alloy:@upn/fixture-lib/src/user-session.ts#UserSession",
+      importPath: "@acme/fixture-lib/user-session",
+      symbolKey: "alloy:@acme/fixture-lib/src/user-session.ts#UserSession",
       scope: "singleton",
       deps: ["AnalyticsService"],
       lazyDeps: [],

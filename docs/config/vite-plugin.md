@@ -45,7 +45,7 @@ List of manifest objects imported from internal libraries. Manifests allow Alloy
 See [Internal Libraries](/guide/libraries) for details on generating and consuming manifests.
 
 ```typescript
-import { manifest } from "@upn/my-internal-lib/manifest";
+import { manifest } from "@acme/my-internal-lib/manifest";
 
 alloy({
   manifests: [manifest],

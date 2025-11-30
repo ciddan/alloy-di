@@ -3,17 +3,17 @@ import fs from "node:fs";
 import path from "node:path";
 // Resolve paths used both in setup and guards
 const PKG_ROOT = path.resolve(__dirname, "../../../");
-const LINK_TARGET = path.join(PKG_ROOT, "node_modules", "@upn", "fixture-lib");
+const LINK_TARGET = path.join(PKG_ROOT, "node_modules", "@acme", "fixture-lib");
 
 const hasFixturePackage = () => fs.existsSync(LINK_TARGET);
 
 // Establish symlink into node_modules so ESM subpath specifiers resolve as packages.
 beforeAll(() => {
   // Ensure a symlink exists so bare specifiers resolve under tests
-  const nodeModulesUpn = path.join(PKG_ROOT, "node_modules", "@upn");
+  const nodeModulesAcme = path.join(PKG_ROOT, "node_modules", "@acme");
   const fixtureRoot = path.join(PKG_ROOT, "tests", "fixture-lib");
-  if (!fs.existsSync(nodeModulesUpn)) {
-    fs.mkdirSync(nodeModulesUpn, { recursive: true });
+  if (!fs.existsSync(nodeModulesAcme)) {
+    fs.mkdirSync(nodeModulesAcme, { recursive: true });
   }
   try {
     if (fs.existsSync(LINK_TARGET)) {
@@ -35,7 +35,7 @@ describe("fixture-lib flattened subpath imports", () => {
       return;
     }
     // @ts-expect-error TS cannot verify dynamic import paths
-    const mod = await import("@upn/fixture-lib/analytics-service");
+    const mod = await import("@acme/fixture-lib/analytics-service");
     expect(typeof mod.AnalyticsService).toBe("function");
   });
   it("resolves event-tracker", async () => {
@@ -44,7 +44,7 @@ describe("fixture-lib flattened subpath imports", () => {
       return;
     }
     // @ts-expect-error TS cannot verify dynamic import paths
-    const mod = await import("@upn/fixture-lib/event-tracker");
+    const mod = await import("@acme/fixture-lib/event-tracker");
     expect(typeof mod.EventTracker).toBe("function");
   });
   it("resolves user-session", async () => {
@@ -53,7 +53,7 @@ describe("fixture-lib flattened subpath imports", () => {
       return;
     }
     // @ts-expect-error TS cannot verify dynamic import paths
-    const mod = await import("@upn/fixture-lib/user-session");
+    const mod = await import("@acme/fixture-lib/user-session");
     expect(typeof mod.UserSession).toBe("function");
   });
   it("manifest importPaths align & are loadable", async () => {
@@ -62,7 +62,7 @@ describe("fixture-lib flattened subpath imports", () => {
       return;
     }
     // @ts-expect-error TS cannot verify dynamic import paths
-    const manifestMod = await import("@upn/fixture-lib/manifest");
+    const manifestMod = await import("@acme/fixture-lib/manifest");
     const services: Array<{ exportName: string; importPath: string }> =
       manifestMod.manifest.services;
     for (const svc of services) {
