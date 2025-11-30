@@ -13,7 +13,7 @@ export default defineConfig({
         "./tests/**",
       ],
       provider: "v8",
-      reporter: ["text", "json", "html"],
+      reporter: ["text", "json", "html", "lcov"],
       reportsDirectory: "./analytics/coverage",
     },
     globals: false,
