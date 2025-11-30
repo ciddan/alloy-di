@@ -49,6 +49,10 @@
     "url": "https://github.com/ciddan/alloy-di/tree/main/packages/alloy"
   },
   "homepage": "https://alloy-di.dev",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "files": [
     "dist",
     "README.md"
