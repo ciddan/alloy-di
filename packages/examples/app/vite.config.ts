@@ -7,6 +7,9 @@ import { manifest } from "@alloy-di/example-library-internal/manifest";
 
 export default defineConfig(async () => {
   return {
+    server: {
+      port: 5273,
+    },
     build: {
       minify: false,
       sourcemap: true,
