@@ -203,10 +203,31 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
       // Attach identifier keys to local metas for deterministic output
       for (const meta of metas) {
+        const normalizedMetaPath = normalizeImportPath(meta.filePath);
+        const trimmedNormalizedMetaPath = normalizedMetaPath.replace(
+          /^\/+/g,
+          "",
+        );
+        const looksRootRelative =
+          normalizedMetaPath === "/src" ||
+          normalizedMetaPath.startsWith("/src/");
+
         let relPath = path.relative(resolvedRoot, meta.filePath);
         if (path.sep === "\\") {
           relPath = relPath.split(path.sep).join("/");
         }
+
+        if (
+          looksRootRelative ||
+          !relPath ||
+          relPath.startsWith("..") ||
+          relPath.startsWith("\\")
+        ) {
+          relPath =
+            trimmedNormalizedMetaPath ||
+            normalizedMetaPath.replace(/^\/+/g, "");
+        }
+
         meta.identifierKey = `alloy:${packageName}/${relPath}#${meta.className}`;
       }
 

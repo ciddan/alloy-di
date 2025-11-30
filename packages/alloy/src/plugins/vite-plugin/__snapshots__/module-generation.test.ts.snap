@@ -16,7 +16,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const ServiceDIdentifier = registerServiceIdentifier(ServiceD, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-d.ts#ServiceD'));
+const ServiceDIdentifier = registerServiceIdentifier(ServiceD, Symbol.for('alloy:UNKNOWN_PACKAGE/src/service-d.ts#ServiceD'));
 
 export const serviceIdentifiers = {
   'ServiceD': ServiceDIdentifier
@@ -44,7 +44,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const ServiceCIdentifier = registerServiceIdentifier(ServiceC, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-c.ts#ServiceC'));
+const ServiceCIdentifier = registerServiceIdentifier(ServiceC, Symbol.for('alloy:UNKNOWN_PACKAGE/src/service-c.ts#ServiceC'));
 
 export const serviceIdentifiers = {
   'ServiceC': ServiceCIdentifier
@@ -70,7 +70,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const ServiceAIdentifier = registerServiceIdentifier(ServiceA, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/service-a.ts#ServiceA'));
+const ServiceAIdentifier = registerServiceIdentifier(ServiceA, Symbol.for('alloy:UNKNOWN_PACKAGE/src/service-a.ts#ServiceA'));
 
 export const serviceIdentifiers = {
   'ServiceA': ServiceAIdentifier
@@ -96,7 +96,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const SingletonServiceDoubleIdentifier = registerServiceIdentifier(SingletonServiceDouble, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/singleton-service-double.ts#SingletonServiceDouble'));
+const SingletonServiceDoubleIdentifier = registerServiceIdentifier(SingletonServiceDouble, Symbol.for('alloy:UNKNOWN_PACKAGE/src/singleton-service-double.ts#SingletonServiceDouble'));
 
 export const serviceIdentifiers = {
   'SingletonServiceDouble': SingletonServiceDoubleIdentifier
@@ -122,7 +122,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const SingletonServiceIdentifier = registerServiceIdentifier(SingletonService, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/singleton-service.ts#SingletonService'));
+const SingletonServiceIdentifier = registerServiceIdentifier(SingletonService, Symbol.for('alloy:UNKNOWN_PACKAGE/src/singleton-service.ts#SingletonService'));
 
 export const serviceIdentifiers = {
   'SingletonService': SingletonServiceIdentifier
@@ -148,7 +148,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const ShSingletonIdentifier = registerServiceIdentifier(ShSingleton, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/sh-singleton.ts#ShSingleton'));
+const ShSingletonIdentifier = registerServiceIdentifier(ShSingleton, Symbol.for('alloy:UNKNOWN_PACKAGE/src/sh-singleton.ts#ShSingleton'));
 
 export const serviceIdentifiers = {
   'ShSingleton': ShSingletonIdentifier
@@ -193,7 +193,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const WinPathServiceIdentifier = registerServiceIdentifier(WinPathService, Symbol.for('alloy:UNKNOWN_PACKAGE/src\\nested\\win-path-service.ts#WinPathService'));
+const WinPathServiceIdentifier = registerServiceIdentifier(WinPathService, Symbol.for('alloy:UNKNOWN_PACKAGE/src/nested/win-path-service.ts#WinPathService'));
 
 export const serviceIdentifiers = {
   'WinPathService': WinPathServiceIdentifier
@@ -219,7 +219,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const UiComponentIdentifier = registerServiceIdentifier(UiComponent, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/ui-component.tsx#UiComponent'));
+const UiComponentIdentifier = registerServiceIdentifier(UiComponent, Symbol.for('alloy:UNKNOWN_PACKAGE/src/ui-component.tsx#UiComponent'));
 
 export const serviceIdentifiers = {
   'UiComponent': UiComponentIdentifier

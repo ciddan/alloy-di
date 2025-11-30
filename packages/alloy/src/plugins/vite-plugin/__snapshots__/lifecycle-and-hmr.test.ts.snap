@@ -16,7 +16,7 @@ const container = new Container();
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
-const TempServiceIdentifier = registerServiceIdentifier(TempService, Symbol.for('alloy:UNKNOWN_PACKAGE/../../../../../../src/hmr-remove.ts#TempService'));
+const TempServiceIdentifier = registerServiceIdentifier(TempService, Symbol.for('alloy:UNKNOWN_PACKAGE/src/hmr-remove.ts#TempService'));
 
 export const serviceIdentifiers = {
   'TempService': TempServiceIdentifier
