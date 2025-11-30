@@ -1,6 +1,7 @@
 import { Suspense, use, useEffect, useState } from "react";
 
 import container, { serviceIdentifiers } from "virtual:alloy-container";
+import alloyLogo from "../assets/alloy.svg";
 import styles from "./App.module.scss";
 
 const {
@@ -38,7 +39,14 @@ function AppContent() {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Vite + React</h1>
+      <img
+        src={alloyLogo}
+        alt="Alloy logo"
+        width={256}
+        height={256}
+        style={{ marginBottom: "1rem" }}
+      />
+      <h1 className={styles.title}>Vite + Alloy</h1>
       <div className={styles.card}>
         <button className={styles.button} onClick={handleClick}>
           count is {count}
