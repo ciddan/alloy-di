@@ -82,3 +82,24 @@ These files provide TypeScript support for:
 2. `serviceIdentifiers` type safety.
 
 Relative paths are resolved against the project root.
+
+### visualize
+
+- **Type:** `boolean | { mermaid?: boolean | { outputPath?: string; direction?: "LR" | "TB" | "BT" | "RL"; includeLegend?: boolean; scopeColors?: Partial<Record<ServiceScope, string>>; lazyNodeFill?: string; factoryNodeFill?: string; tokenNodeFill?: string; nodeStrokeColor?: string; nodeTextColor?: string; lazyEdgeColor?: string; eagerEdgeColor?: string; factoryEdgeColor?: string } }`
+- **Default:** `false`
+
+Enables dependency graph emission. When set to `true`, the plugin writes a Mermaid (`.mmd`) diagram named `alloy-di.mmd` in the project root each time the container is regenerated. Provide an object to override the output path or any stylistic options supported by the visualizer.
+
+```ts
+alloy({
+  visualize: {
+    mermaid: {
+      outputPath: "./docs/di-graph.mmd",
+      direction: "TB",
+      includeLegend: false,
+    },
+  },
+});
+```
+
+Set `visualize: false` (or omit the option) to disable artifact generation entirely, or pass `visualize: true` for the default `./alloy-di.mmd` output with standard styling.
