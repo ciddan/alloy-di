@@ -8,6 +8,7 @@
 **/.turbo
 **/dist
 packages/**/analytics
+coverage/
 packages/**/tsconfig.tsbuildinfo
 **/src/alloy-container.d.ts
 **/src/alloy-manifests.d.ts
