@@ -18,15 +18,15 @@ export function processLazyCall(
   sourceFile: ts.SourceFile,
   localLazyRefs: Set<string>,
 ) {
-  const exprText = node.expression.getText(sourceFile);
-  if (exprText !== "Lazy") {
+  if (node.expression.getText(sourceFile) !== "Lazy") {
     return;
   }
   const classKeys = resolveLazyTarget(node, fileId);
-  if (classKeys) {
-    for (const key of classKeys) {
-      localLazyRefs.add(key);
-    }
+  if (!classKeys) {
+    return;
+  }
+  for (const key of classKeys) {
+    localLazyRefs.add(key);
   }
 }
 
@@ -34,11 +34,8 @@ function resolveLazyTarget(
   node: ts.CallExpression,
   fileId: string,
 ): string[] | undefined {
-  if (node.arguments.length === 0) {
-    return undefined;
-  }
-  const factory = node.arguments[0];
-  if (!(ts.isArrowFunction(factory) || ts.isFunctionExpression(factory))) {
+  const factory = getLazyFactory(node.arguments[0]);
+  if (!factory) {
     return undefined;
   }
   const body = getReturnedExpression(factory);
@@ -46,7 +43,8 @@ function resolveLazyTarget(
     return undefined;
   }
   const importInfo = extractImportInfo(body);
-  if (!importInfo) {
+  const exportName = importInfo?.exportName;
+  if (!importInfo || !exportName) {
     return undefined;
   }
   const resolvedPaths = resolveModuleSpecifierCandidates(
@@ -56,13 +54,21 @@ function resolveLazyTarget(
   if (!resolvedPaths.length) {
     return undefined;
   }
-  const exportName = importInfo.exportName;
-  if (!exportName) {
-    return undefined;
-  }
   return resolvedPaths.map((candidate) =>
     createClassKey(candidate, exportName),
   );
+}
+
+function getLazyFactory(
+  arg: ts.Expression | undefined,
+): ts.ArrowFunction | ts.FunctionExpression | undefined {
+  if (!arg) {
+    return undefined;
+  }
+  if (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) {
+    return arg;
+  }
+  return undefined;
 }
 
 function getReturnedExpression(
@@ -82,32 +88,30 @@ function getReturnedExpression(
 function extractImportInfo(
   expr: ts.Expression,
 ): { specifier: string; exportName?: string } | undefined {
-  if (ts.isCallExpression(expr)) {
-    if (isDynamicImport(expr)) {
-      const spec = getImportSpecifier(expr.arguments[0]);
-      if (!spec) {
-        return undefined;
-      }
-      return { specifier: spec, exportName: undefined };
-    }
-    if (
-      ts.isPropertyAccessExpression(expr.expression) &&
-      expr.expression.name.text === "then"
-    ) {
-      const importCall = expr.expression.expression;
-      if (!ts.isCallExpression(importCall) || !isDynamicImport(importCall)) {
-        return undefined;
-      }
-      const spec = getImportSpecifier(importCall.arguments[0]);
-      if (!spec) {
-        return undefined;
-      }
-      const callback = expr.arguments[0];
-      const exportName = callback ? extractExportName(callback) : undefined;
-      return { specifier: spec, exportName };
-    }
+  if (!ts.isCallExpression(expr)) {
+    return undefined;
   }
-  return undefined;
+  if (isDynamicImport(expr)) {
+    const spec = getImportSpecifier(expr.arguments[0]);
+    return spec ? { specifier: spec } : undefined;
+  }
+  if (!ts.isPropertyAccessExpression(expr.expression)) {
+    return undefined;
+  }
+  if (expr.expression.name.text !== "then") {
+    return undefined;
+  }
+  const importCall = expr.expression.expression;
+  if (!ts.isCallExpression(importCall) || !isDynamicImport(importCall)) {
+    return undefined;
+  }
+  const spec = getImportSpecifier(importCall.arguments[0]);
+  if (!spec) {
+    return undefined;
+  }
+  const callback = expr.arguments[0];
+  const exportName = callback ? extractExportName(callback) : undefined;
+  return { specifier: spec, exportName };
 }
 
 function isDynamicImport(node: ts.CallExpression): boolean {
@@ -117,22 +121,13 @@ function isDynamicImport(node: ts.CallExpression): boolean {
 function getImportSpecifier(
   node: ts.Expression | undefined,
 ): string | undefined {
-  if (!node) {
-    return undefined;
-  }
-  if (ts.isStringLiteralLike(node)) {
-    return node.text;
-  }
-  return undefined;
+  return node && ts.isStringLiteralLike(node) ? node.text : undefined;
 }
 
 function extractExportName(callback: ts.Expression): string | undefined {
   if (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) {
     const body = getReturnedExpression(callback);
-    if (!body) {
-      return undefined;
-    }
-    return extractExportNameFromExpression(body);
+    return body ? extractExportNameFromExpression(body) : undefined;
   }
   return extractExportNameFromExpression(callback);
 }
@@ -161,19 +156,14 @@ function resolveModuleSpecifierCandidates(
   }
   const baseDir = path.dirname(fromId);
   const resolvedBase = path.resolve(baseDir, specifier);
-  const candidates: string[] = [];
-  const hasExtension = Boolean(path.extname(resolvedBase));
-  if (hasExtension) {
-    candidates.push(resolvedBase);
-  } else {
-    for (const ext of RESOLVED_EXTENSIONS) {
-      candidates.push(resolvedBase + ext);
-    }
-    for (const ext of RESOLVED_EXTENSIONS) {
-      candidates.push(path.join(resolvedBase, "index" + ext));
-    }
+  if (path.extname(resolvedBase)) {
+    return [resolvedBase];
   }
-  return candidates;
+  const fileCandidates = RESOLVED_EXTENSIONS.map((ext) => resolvedBase + ext);
+  const indexCandidates = RESOLVED_EXTENSIONS.map((ext) =>
+    path.join(resolvedBase, `index${ext}`),
+  );
+  return [...fileCandidates, ...indexCandidates];
 }
 
 export const __lazyInternals = {

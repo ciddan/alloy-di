@@ -5,32 +5,29 @@ const WINDOWS_DRIVE_PATTERN = /^[A-Za-z]:[\\/]/;
 
 export function normalizeImportPath(p: string): string {
   const raw = p.trim();
-  if (!raw) {
+  if (!raw || isBareModuleSpecifier(raw)) {
     return raw;
   }
+  return ensureLeadingSlash(normalizeSlashes(raw));
+}
 
-  const startsWithSlash = raw.startsWith("/") || raw.startsWith("\\");
-  const startsWithDot = raw.startsWith(".");
-  const startsWithTilde = raw.startsWith("~");
-  const isWindowsDrive = WINDOWS_DRIVE_PATTERN.test(raw);
-  const containsBackslash = raw.includes("\\");
-  const isBareSpecifier =
-    !startsWithSlash &&
-    !startsWithDot &&
-    !startsWithTilde &&
-    !isWindowsDrive &&
-    !containsBackslash;
+function isBareModuleSpecifier(raw: string): boolean {
+  return (
+    !raw.startsWith("/") &&
+    !raw.startsWith("\\") &&
+    !raw.startsWith(".") &&
+    !raw.startsWith("~") &&
+    !WINDOWS_DRIVE_PATTERN.test(raw) &&
+    !raw.includes("\\")
+  );
+}
 
-  if (isBareSpecifier) {
-    return raw;
-  }
+function normalizeSlashes(value: string): string {
+  return value.replace(/\\/g, "/").replace(/^\/+/g, "/");
+}
 
-  let out = raw.replace(/\\/g, "/");
-  out = out.replace(/^\/+/g, "/");
-  if (!out.startsWith("/")) {
-    out = "/" + out;
-  }
-  return out;
+function ensureLeadingSlash(value: string): string {
+  return value.startsWith("/") ? value : `/${value}`;
 }
 
 export function hashString(value: string): string {

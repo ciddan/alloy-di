@@ -78,76 +78,110 @@ export function scanSource(code: string, id: string): ScanResult {
   const fileImports = collectFileImports(sourceFile);
 
   const visit = (node: ts.Node) => {
-    if (!ts.isClassDeclaration(node) || !node.name) {
-      if (ts.isCallExpression(node)) {
-        processLazyCall(node, id, sourceFile, lazyRefs);
-      }
-      ts.forEachChild(node, visit);
-      return;
+    if (ts.isClassDeclaration(node)) {
+      handleClassDeclaration(node, {
+        id,
+        sourceFile,
+        fileImports,
+        discovered,
+      });
+    } else if (ts.isCallExpression(node)) {
+      processLazyCall(node, id, sourceFile, lazyRefs);
     }
-
-    const decorators = ts.getDecorators ? ts.getDecorators(node) : [];
-    const targetDecorator = decorators?.find((d) => {
-      if (!ts.isCallExpression(d.expression)) {
-        return false;
-      }
-      const name = d.expression.expression.getText(sourceFile);
-      return name.endsWith("Injectable") || name.endsWith("Singleton");
-    });
-    if (!targetDecorator || !ts.isCallExpression(targetDecorator.expression)) {
-      ts.forEachChild(node, visit);
-      return;
-    }
-
-    const decoratorName =
-      targetDecorator.expression.expression.getText(sourceFile);
-    const className = node.name.getText(sourceFile);
-    const callExpression = targetDecorator.expression;
-
-    const metadata = extractServiceMetadata(
-      decoratorName,
-      callExpression,
-      sourceFile,
-    );
-
-    const referencedImports: {
-      name: string;
-      path: string;
-      originalName?: string;
-      isTypeOnly?: boolean;
-    }[] = [];
-    const seenIdentifiers = new Set<string>();
-
-    for (const dep of metadata.dependencies) {
-      for (const ident of dep.referencedIdentifiers) {
-        if (seenIdentifiers.has(ident)) {
-          continue;
-        }
-        seenIdentifiers.add(ident);
-
-        const importInfo = fileImports.get(ident);
-        if (importInfo) {
-          referencedImports.push({
-            name: ident,
-            path: importInfo.path,
-            originalName: importInfo.originalName,
-            isTypeOnly: importInfo.isTypeOnly,
-          });
-        }
-      }
-    }
-
-    const classKey = createClassKey(id, className);
-    discovered.set(classKey, {
-      className,
-      filePath: id,
-      identifierKey: createSymbolKey(id, className),
-      metadata,
-      referencedImports,
-    });
     ts.forEachChild(node, visit);
   };
 
   ts.forEachChild(sourceFile, visit);
   return { metas: Array.from(discovered.values()), lazyClassKeys: lazyRefs };
+}
+
+interface ClassVisitContext {
+  id: string;
+  sourceFile: ts.SourceFile;
+  fileImports: Map<string, ImportInfo>;
+  discovered: Map<string, DiscoveredMeta>;
+}
+
+function handleClassDeclaration(
+  node: ts.ClassDeclaration,
+  context: ClassVisitContext,
+) {
+  if (!node.name) {
+    return;
+  }
+  const decoratorCall = findServiceDecorator(node, context.sourceFile);
+  if (!decoratorCall) {
+    return;
+  }
+  const decoratorName = decoratorCall.expression.getText(context.sourceFile);
+  const className = node.name.getText(context.sourceFile);
+  const metadata = extractServiceMetadata(
+    decoratorName,
+    decoratorCall,
+    context.sourceFile,
+  );
+  const referencedImports = collectReferencedImports(
+    metadata,
+    context.fileImports,
+  );
+  const classKey = createClassKey(context.id, className);
+  context.discovered.set(classKey, {
+    className,
+    filePath: context.id,
+    identifierKey: createSymbolKey(context.id, className),
+    metadata,
+    referencedImports,
+  });
+}
+
+function findServiceDecorator(
+  node: ts.ClassDeclaration,
+  sourceFile: ts.SourceFile,
+): ts.CallExpression | undefined {
+  const decorators = ts.getDecorators ? ts.getDecorators(node) : undefined;
+  if (!decorators?.length) {
+    return undefined;
+  }
+  for (const decorator of decorators) {
+    if (!ts.isCallExpression(decorator.expression)) {
+      continue;
+    }
+    const name = decorator.expression.expression.getText(sourceFile);
+    if (name.endsWith("Injectable") || name.endsWith("Singleton")) {
+      return decorator.expression;
+    }
+  }
+  return undefined;
+}
+
+function collectReferencedImports(
+  metadata: ReturnType<typeof extractServiceMetadata>,
+  fileImports: Map<string, ImportInfo>,
+) {
+  const referenced: {
+    name: string;
+    path: string;
+    originalName?: string;
+    isTypeOnly?: boolean;
+  }[] = [];
+  const seen = new Set<string>();
+  for (const dep of metadata.dependencies) {
+    for (const ident of dep.referencedIdentifiers) {
+      if (seen.has(ident)) {
+        continue;
+      }
+      seen.add(ident);
+      const importInfo = fileImports.get(ident);
+      if (!importInfo) {
+        continue;
+      }
+      referenced.push({
+        name: ident,
+        path: importInfo.path,
+        originalName: importInfo.originalName,
+        isTypeOnly: importInfo.isTypeOnly,
+      });
+    }
+  }
+  return referenced;
 }
