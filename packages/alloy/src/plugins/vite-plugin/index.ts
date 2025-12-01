@@ -393,9 +393,6 @@ function resolveVisualizationOptions(
     return null;
   }
   if (typeof input === "boolean") {
-    if (!input) {
-      return null;
-    }
     return {
       outputPath: path.resolve(projectRoot, DEFAULT_MERMAID_FILENAME),
       mermaidOptions: undefined,
