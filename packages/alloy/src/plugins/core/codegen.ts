@@ -8,13 +8,18 @@ import {
 import type { DiscoveredMeta, DependencyDescriptor } from "./types";
 import { IdentifierResolver } from "./identifier-resolver";
 
-interface ResolvedRegistration extends DiscoveredMeta {
+export interface ResolvedRegistration extends DiscoveredMeta {
   importName: string;
   isFactoryLazy: boolean;
   identifierConst: string;
   exportKey: string;
   symbolDescription: string;
   optionsText: string; // Reconstructed
+}
+
+export interface RegistrationEntry {
+  ctorName: string;
+  metaText: string;
 }
 
 function escapeSingleQuotes(value: string): string {
@@ -42,7 +47,7 @@ function createSymbolDescription(meta: DiscoveredMeta): string {
   return createSymbolKey(meta.filePath, meta.className);
 }
 
-interface ResolvedDependencyImport {
+export interface ResolvedDependencyImport {
   localName: string; // The name to use in the virtual module
   importPath: string; // The normalized absolute path to import from
   originalName?: string; // The export name (or default)
@@ -56,41 +61,37 @@ function resolveDependencyImports(metas: DiscoveredMeta[]): {
   dependencyImports: ResolvedDependencyImport[];
   importMap: Map<string, ResolvedDependencyImport>;
 } {
-  const importMap = new Map<string, ResolvedDependencyImport>(); // Key: absPath::originalName
+  const importMap = new Map<string, ResolvedDependencyImport>();
   const nameCounts = new Map<string, number>();
 
   const getUniqueName = (name: string) => {
-    const count = nameCounts.get(name) || 0;
+    const count = nameCounts.get(name) ?? 0;
     nameCounts.set(name, count + 1);
     return count === 0 ? name : `${name}_${count}`;
   };
 
   for (const meta of metas) {
-    if (meta.referencedImports) {
-      for (const ref of meta.referencedImports) {
-        if (ref.isTypeOnly) {
-          continue;
-        }
-        // Resolve absolute path
-        const dir = path.dirname(meta.filePath);
-        const absPath = ref.path.startsWith(".")
-          ? path.resolve(dir, ref.path)
-          : ref.path;
-        const normalizedPath = normalizeImportPath(absPath);
-
-        const key = `${normalizedPath}::${ref.originalName ?? "default"}`;
-        let resolved = importMap.get(key);
-
-        if (!resolved) {
-          const uniqueName = getUniqueName(ref.name);
-          resolved = {
-            localName: uniqueName,
-            importPath: normalizedPath,
-            originalName: ref.originalName,
-          };
-          importMap.set(key, resolved);
-        }
+    if (!meta.referencedImports?.length) {
+      continue;
+    }
+    for (const ref of meta.referencedImports) {
+      if (ref.isTypeOnly) {
+        continue;
       }
+      const normalizedPath = normalizeImportPath(
+        ref.path.startsWith(".")
+          ? path.resolve(path.dirname(meta.filePath), ref.path)
+          : ref.path,
+      );
+      const key = `${normalizedPath}::${ref.originalName ?? "default"}`;
+      if (importMap.has(key)) {
+        continue;
+      }
+      importMap.set(key, {
+        localName: getUniqueName(ref.name),
+        importPath: normalizedPath,
+        originalName: ref.originalName,
+      });
     }
   }
 
@@ -191,24 +192,58 @@ function buildImportsAndRegistrations(
   runtimeImportStatement: string;
   registrationsBlock: string;
   stubsBlock: string;
-  identifierDeclarations: string;
   identifierExportBlock: string;
 } {
-  const activeMetas = metas.filter(
+  const activeMetas = filterActiveMetas(metas, lazyReferencedClassKeys);
+  const { dependencyImports, importMap } =
+    resolveDependencyImports(activeMetas);
+  const resolver = new IdentifierResolver(activeMetas);
+  const resolvedRegistrations = enrichRegistrations(
+    activeMetas,
+    resolver,
+    importMap,
+  );
+  const runtimeImports = computeRuntimeImports(
+    resolvedRegistrations,
+    hasProviderModules,
+  );
+  const runtimeImportStatement = formatRuntimeImportStatement(runtimeImports);
+  const stubsBlock = createStubBlock(
+    dependencyImports,
+    resolvedRegistrations,
+    runtimeImports,
+  );
+  const registrationEntries = buildRegistrationEntries(resolvedRegistrations);
+  const registrationsBlock = createRegistrationsBlock(registrationEntries);
+  const identifierExportBlock = createIdentifierExports(resolvedRegistrations);
+
+  return {
+    runtimeImportStatement,
+    registrationsBlock,
+    stubsBlock,
+    identifierExportBlock,
+  };
+}
+
+function filterActiveMetas(
+  metas: DiscoveredMeta[],
+  lazyReferencedClassKeys: Set<string>,
+): DiscoveredMeta[] {
+  return metas.filter(
     (meta) =>
       !lazyReferencedClassKeys.has(
         createClassKey(meta.filePath, meta.className),
       ),
   );
+}
 
-  const { dependencyImports, importMap } =
-    resolveDependencyImports(activeMetas);
-
-  const resolver = new IdentifierResolver(activeMetas);
-
-  const resolvedImports: ResolvedRegistration[] = activeMetas.map((meta) => {
+function enrichRegistrations(
+  activeMetas: DiscoveredMeta[],
+  resolver: IdentifierResolver,
+  importMap: Map<string, ResolvedDependencyImport>,
+): ResolvedRegistration[] {
+  return activeMetas.map((meta) => {
     const importName = resolver.resolve(meta.className, meta.filePath);
-    const isFactoryLazy = !!meta.metadata.factory;
     const identifierConst = `${importName}Identifier`;
     const exportKey = createIdentifierExportKey(meta, resolver);
     const symbolDescription =
@@ -218,39 +253,48 @@ function buildImportsAndRegistrations(
     return {
       ...meta,
       importName,
-      isFactoryLazy,
+      isFactoryLazy: Boolean(meta.metadata.factory),
       identifierConst,
       exportKey,
       symbolDescription,
       optionsText,
     };
   });
+}
 
-  const needsLazyImport = activeMetas.some(
+function computeRuntimeImports(
+  registrations: ResolvedRegistration[],
+  hasProviderModules: boolean,
+): Set<string> {
+  const imports = new Set<string>(["Container", "dependenciesRegistry"]);
+  const needsLazyImport = registrations.some(
     (m) =>
       m.metadata.dependencies.some((d) => d.isLazy) || !!m.metadata.factory,
   );
-
-  const runtimeImports = new Set<string>(["Container", "dependenciesRegistry"]);
-
   if (hasProviderModules) {
-    runtimeImports.add("applyProviders");
+    imports.add("applyProviders");
   }
   if (needsLazyImport) {
-    runtimeImports.add("Lazy");
+    imports.add("Lazy");
   }
-  if (resolvedImports.length) {
-    runtimeImports.add("registerServiceIdentifier");
+  if (registrations.length) {
+    imports.add("registerServiceIdentifier");
   }
+  return imports;
+}
 
-  const runtimeImportStatement = `\nimport { ${Array.from(runtimeImports).join(
-    ", ",
-  )} } from 'alloy-di/runtime';\n`;
+function formatRuntimeImportStatement(imports: Set<string>): string {
+  return `\nimport { ${Array.from(imports).join(", ")} } from 'alloy-di/runtime';\n`;
+}
 
-  const stubDeclarations: string[] = [];
+function createStubBlock(
+  dependencyImports: ResolvedDependencyImport[],
+  registrations: ResolvedRegistration[],
+  runtimeImports: Set<string>,
+): string {
+  const statements: string[] = [];
   const importedNames = new Set<string>(runtimeImports);
 
-  // Add dependency imports
   for (const dep of dependencyImports) {
     if (
       dep.importPath === "alloy-di/runtime" &&
@@ -260,91 +304,98 @@ function buildImportsAndRegistrations(
     ) {
       continue;
     }
-
     if (importedNames.has(dep.localName)) {
       continue;
     }
-
-    if (dep.originalName === "default") {
-      stubDeclarations.push(
-        `import ${dep.localName} from '${dep.importPath}';`,
-      );
-    } else if (dep.originalName === "*") {
-      stubDeclarations.push(
-        `import * as ${dep.localName} from '${dep.importPath}';`,
-      );
-    } else if (dep.originalName && dep.originalName !== dep.localName) {
-      stubDeclarations.push(
-        `import { ${dep.originalName} as ${dep.localName} } from '${dep.importPath}';`,
-      );
-    } else {
-      stubDeclarations.push(
-        `import { ${dep.localName} } from '${dep.importPath}';`,
-      );
-    }
+    statements.push(createDependencyImportStatement(dep));
     importedNames.add(dep.localName);
   }
 
-  for (const meta of resolvedImports) {
+  for (const meta of registrations) {
     if (meta.isFactoryLazy) {
-      stubDeclarations.push(`class ${meta.importName} {}`);
+      statements.push(`class ${meta.importName} {}`);
       continue;
     }
-
     if (importedNames.has(meta.importName)) {
       continue;
     }
-
-    const isBareSpecifier =
-      !/^(\/|[A-Za-z]:\\|\.|~)/.test(meta.filePath) &&
-      !meta.filePath.includes("\\");
-    const importPath = isBareSpecifier
-      ? meta.filePath
-      : normalizeImportPath(meta.filePath);
-    if (meta.importName === meta.className) {
-      stubDeclarations.push(
-        `import { ${meta.className} } from '${importPath}';`,
-      );
-    } else {
-      stubDeclarations.push(
-        `import { ${meta.className} as ${meta.importName} } from '${importPath}';`,
-      );
-    }
+    statements.push(createServiceImportStatement(meta));
     importedNames.add(meta.importName);
   }
 
-  const registrationEntries = resolvedImports
-    .map((m) => `  { ctor: ${m.importName}, meta: ${m.optionsText} }`)
-    .join(",\n");
-  const registrationsBlock = registrationEntries
-    ? `const registrations = [\n${registrationEntries}\n];`
-    : `const registrations = [];`;
-  const stubsBlock = stubDeclarations.length
-    ? `${stubDeclarations.join("\n")}\n`
-    : "";
+  return statements.length ? `${statements.join("\n")}\n` : "";
+}
 
-  const identifierDeclarations = resolvedImports
+function createDependencyImportStatement(
+  dep: ResolvedDependencyImport,
+): string {
+  if (dep.originalName === "default") {
+    return `import ${dep.localName} from '${dep.importPath}';`;
+  }
+  if (dep.originalName === "*") {
+    return `import * as ${dep.localName} from '${dep.importPath}';`;
+  }
+  if (dep.originalName && dep.originalName !== dep.localName) {
+    return `import { ${dep.originalName} as ${dep.localName} } from '${dep.importPath}';`;
+  }
+  return `import { ${dep.localName} } from '${dep.importPath}';`;
+}
+
+function createServiceImportStatement(meta: ResolvedRegistration): string {
+  const isBareSpecifier =
+    !/^(\/|[A-Za-z]:\\|\.|~)/.test(meta.filePath) &&
+    !meta.filePath.includes("\\");
+  const importPath = isBareSpecifier
+    ? meta.filePath
+    : normalizeImportPath(meta.filePath);
+  if (meta.importName === meta.className) {
+    return `import { ${meta.className} } from '${importPath}';`;
+  }
+  return `import { ${meta.className} as ${meta.importName} } from '${importPath}';`;
+}
+
+function buildRegistrationEntries(
+  registrations: ResolvedRegistration[],
+): RegistrationEntry[] {
+  return registrations.map((m) => ({
+    ctorName: m.importName,
+    metaText: m.optionsText,
+  }));
+}
+
+function createRegistrationsBlock(entries: RegistrationEntry[]): string {
+  if (!entries.length) {
+    return "const registrations = [];";
+  }
+  const lines = entries
+    .map((entry) => `  { ctor: ${entry.ctorName}, meta: ${entry.metaText} }`)
+    .join(",\n");
+  return `const registrations = [\n${lines}\n];`;
+}
+
+function createIdentifierExports(
+  registrations: ResolvedRegistration[],
+): string {
+  if (!registrations.length) {
+    return "export const serviceIdentifiers = {};\n";
+  }
+  const declarations = registrations
     .map(
       (meta) =>
         `const ${meta.identifierConst} = registerServiceIdentifier(${meta.importName}, Symbol.for('${escapeSingleQuotes(meta.symbolDescription)}'));`,
     )
     .join("\n");
-
-  const identifierExportEntries = resolvedImports
+  const entries = registrations
     .map((meta) => `  '${meta.exportKey}': ${meta.identifierConst}`)
     .join(",\n");
-  const identifierExportBlock = resolvedImports.length
-    ? `${identifierDeclarations}\n\nexport const serviceIdentifiers = {\n${identifierExportEntries}\n};\n`
-    : `export const serviceIdentifiers = {};\n`;
-
-  return {
-    runtimeImportStatement,
-    registrationsBlock,
-    stubsBlock,
-    identifierDeclarations,
-    identifierExportBlock,
-  };
+  return `${declarations}\n\nexport const serviceIdentifiers = {\n${entries}\n};\n`;
 }
+
+export const __codegenInternals = {
+  computeRuntimeImports,
+  createStubBlock,
+  createRegistrationsBlock,
+};
 
 /**
  * Generates the virtual container module code.
