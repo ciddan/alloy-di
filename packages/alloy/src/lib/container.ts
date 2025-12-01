@@ -66,13 +66,13 @@ function formatFactoryLazyWarning(target: Constructor): string {
  * performs singleton caching, and supports token-based value providers.
  */
 export class Container {
-  private singletons = new Map<Constructor, unknown>();
-  private pendingSingletons = new Map<Constructor, Promise<unknown>>();
+  private readonly singletons = new Map<Constructor, unknown>();
+  private readonly pendingSingletons = new Map<Constructor, Promise<unknown>>();
   // Instance-level overrides for tests: when present, resolution returns the provided instance
-  private instanceOverrides = new Map<Constructor, unknown>();
-  private metadataCache = new Map<Constructor, ServiceMetadata>();
-  private valueProviders = new Map<symbol, unknown>();
-  private factoryWarningCache = new WeakSet<Constructor>();
+  private readonly instanceOverrides = new Map<Constructor, unknown>();
+  private readonly metadataCache = new Map<Constructor, ServiceMetadata>();
+  private readonly valueProviders = new Map<symbol, unknown>();
+  private readonly factoryWarningCache = new WeakSet<Constructor>();
 
   /**
    * Resolve (and construct) the requested service.

@@ -277,7 +277,7 @@ function resolveNodeId(meta: DiscoveredMeta, index: number): string {
  * Normalizes arbitrary strings into Mermaid-safe identifiers, hashing when a leading letter is missing.
  */
 function sanitizeMermaidId(source: string, fallbackIndex: number): string {
-  const condensed = source.replace(/[^A-Za-z0-9_]/g, "_");
+  const condensed = source.replaceAll(/[^A-Za-z0-9_]/g, "_");
   if (condensed && /^[A-Za-z]/.test(condensed)) {
     return condensed;
   }
@@ -288,7 +288,7 @@ function sanitizeMermaidId(source: string, fallbackIndex: number): string {
  * Escapes problematic characters in labels so Mermaid renders them literally.
  */
 function escapeMermaidLabel(label: string): string {
-  return label.replace(/"/g, '\\"').replace(/\|/g, "/");
+  return label.replaceAll('"', '\\"').replaceAll("|", "/");
 }
 
 /**
@@ -520,7 +520,7 @@ function ensureTokenNode(
  * Condenses arbitrary strings into stable token labels, truncating overly long values.
  */
 function createTokenLabel(raw: string): string {
-  const condensed = raw.replace(/\s+/g, " ").trim();
+  const condensed = raw.replaceAll(/\s+/g, " ").trim();
   if (!condensed) {
     return "anonymous-token";
   }

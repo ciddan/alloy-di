@@ -206,8 +206,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       "\0virtual:alloy-container",
     )) as string;
 
-    const p0 = path.resolve(root, "src/providers.ts").replace(/\\/g, "/");
-    const p1 = path.resolve(root, "providers/custom.ts").replace(/\\/g, "/");
+    const p0 = path.resolve(root, "src/providers.ts").replaceAll("\\", "/");
+    const p1 = path.resolve(root, "providers/custom.ts").replaceAll("\\", "/");
 
     expect(generatedCode).toContain(`import providers_0 from '${p0}';`);
     expect(generatedCode).toContain(`import providers_1 from '${p1}';`);
@@ -411,7 +411,7 @@ describe("Vite Plugin Alloy - module generation", () => {
     // Use resolved path for dedup check
     const providerPath = path
       .resolve(root, "src/providers.ts")
-      .replace(/\\/g, "/");
+      .replaceAll("\\", "/");
 
     const manifest = {
       schemaVersion: 1,
@@ -439,7 +439,7 @@ describe("Vite Plugin Alloy - module generation", () => {
     )) as string;
 
     const p0 = providerPath;
-    const p1 = path.resolve(root, "providers/custom.ts").replace(/\\/g, "/");
+    const p1 = path.resolve(root, "providers/custom.ts").replaceAll("\\", "/");
     const p2 = "@scope/lib/providers/default";
 
     // Expect merged order: config src/providers, config providers/custom, manifest (dedup of providerPath and then @scope/ default)

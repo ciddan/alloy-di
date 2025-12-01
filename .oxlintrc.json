@@ -39,6 +39,7 @@
     "no-var-requires": "error",
     "prefer-add-event-listener": "error",
     "prefer-literal-enum-member": "error",
+    "prefer-string-replace-all": "error",
     "preserve-caught-error": "error",
     "require-module-specifiers": "error",
     "require-post-message-target-origin": "error"

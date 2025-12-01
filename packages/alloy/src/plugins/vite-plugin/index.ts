@@ -237,7 +237,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       // Attach identifier keys to local metas for deterministic output
       for (const meta of metas) {
         const normalizedMetaPath = normalizeImportPath(meta.filePath);
-        const trimmedNormalizedMetaPath = normalizedMetaPath.replace(
+        const trimmedNormalizedMetaPath = normalizedMetaPath.replaceAll(
           /^\/+/g,
           "",
         );
@@ -258,7 +258,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         ) {
           relPath =
             trimmedNormalizedMetaPath ||
-            normalizedMetaPath.replace(/^\/+/g, "");
+            normalizedMetaPath.replaceAll(/^\/+/g, "");
         }
 
         meta.identifierKey = `alloy:${packageName}/${relPath}#${meta.className}`;

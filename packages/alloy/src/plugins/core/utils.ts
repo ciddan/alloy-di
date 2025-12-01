@@ -23,7 +23,7 @@ function isBareModuleSpecifier(raw: string): boolean {
 }
 
 function normalizeSlashes(value: string): string {
-  return value.replace(/\\/g, "/").replace(/^\/+/g, "/");
+  return value.replaceAll("\\", "/").replaceAll(/^\/+/g, "/");
 }
 
 function ensureLeadingSlash(value: string): string {
@@ -33,7 +33,7 @@ function ensureLeadingSlash(value: string): string {
 export function hashString(value: string): string {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+    hash = Math.trunc(hash * 31 + value.charCodeAt(i));
   }
   return Math.abs(hash).toString(36);
 }

@@ -23,7 +23,7 @@ export interface RegistrationEntry {
 }
 
 function escapeSingleQuotes(value: string): string {
-  return value.replace(/'/g, "\\'");
+  return value.replaceAll("'", "\\'");
 }
 
 /**
@@ -111,12 +111,12 @@ function reconstructDependencyExpression(
   for (const ident of dep.referencedIdentifiers) {
     const replacement = rewriter(ident);
     if (replacement && replacement !== ident) {
-      expr = expr.replace(new RegExp(`\\b${ident}\\b`, "g"), replacement);
+      expr = expr.replaceAll(new RegExp(`\\b${ident}\\b`, "g"), replacement);
     }
   }
 
   if (dep.isLazy) {
-    expr = expr.replace(
+    expr = expr.replaceAll(
       /import\s*\(\s*(['"])(.+?)\1\s*\)/g,
       (match, quote, importPath) => {
         if (importPath.startsWith(".")) {

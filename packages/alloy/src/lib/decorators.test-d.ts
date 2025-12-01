@@ -11,7 +11,7 @@ describe("Decorator Type-Safety", () => {
     class WrongDep {}
 
     // Correct usage
-    expectTypeOf(Injectable([Dep1, Dep2])).toMatchTypeOf<
+    expectTypeOf(Injectable([Dep1, Dep2])).toExtend<
       (target: new (d1: Dep1, d2: Dep2) => unknown) => void
     >();
 
@@ -30,8 +30,8 @@ describe("Decorator Type-Safety", () => {
     @Injectable([Dep1])
     class TooManyParams {
       constructor(
-        private dep1: Dep1,
-        private dep2: Dep2,
+        private readonly dep1: Dep1,
+        private readonly dep2: Dep2,
       ) {}
     }
     // @ts-expect-error Too many constructor parameters
@@ -39,7 +39,7 @@ describe("Decorator Type-Safety", () => {
 
     @Injectable([Dep1])
     class MismatchedParam {
-      constructor(private wrong: WrongDep) {}
+      constructor(private readonly wrong: WrongDep) {}
     }
     // @ts-expect-error Mismatched constructor parameter type
     assertDeps(deps(Dep1), MismatchedParam);
@@ -47,8 +47,8 @@ describe("Decorator Type-Safety", () => {
     @Injectable([Dep1, Dep2])
     class MismatchedOrder {
       constructor(
-        private dep2: Dep2,
-        private dep1: Dep1,
+        private readonly dep2: Dep2,
+        private readonly dep1: Dep1,
       ) {}
     }
     // @ts-expect-error Mismatched parameter order
@@ -66,7 +66,7 @@ describe("Decorator Type-Safety", () => {
 
     @Singleton([Dep1])
     class MismatchedSingleton {
-      constructor(private wrong: WrongDep) {}
+      constructor(private readonly wrong: WrongDep) {}
     }
     // @ts-expect-error Mismatched constructor parameter type
     assertDeps(deps(Dep1), MismatchedSingleton);
@@ -83,7 +83,7 @@ describe("Decorator Type-Safety", () => {
     // @ts-expect-error Constructor expects the resolved type, not the Lazy wrapper
     @Injectable([Lazy(() => Promise.resolve(LazyDep))])
     class MismatchedLazy {
-      constructor(private lazy: Lazy<LazyDep>) {}
+      constructor(private readonly lazy: Lazy<LazyDep>) {}
     }
     // @ts-expect-error Constructor expects the resolved type, not the Lazy wrapper
     assertDeps(deps(Lazy(() => Promise.resolve(LazyDep))), MismatchedLazy);
