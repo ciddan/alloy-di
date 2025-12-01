@@ -5,6 +5,8 @@ export interface DependencyDescriptor {
   expression: string;
   /** Identifiers referenced within this dependency expression */
   referencedIdentifiers: string[];
+  /** Identifiers that should be ignored by visualizers/codegen (parameters, helpers, etc.) */
+  ignoredIdentifiers?: string[];
   /** Whether this dependency is wrapped in Lazy(...) */
   isLazy: boolean;
 }

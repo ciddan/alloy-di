@@ -12,8 +12,14 @@ function dep(
   expression: string,
   referencedIdentifiers: string[],
   isLazy = false,
+  ignoredIdentifiers?: string[],
 ): DependencyDescriptor {
-  return { expression, referencedIdentifiers, isLazy };
+  return {
+    expression,
+    referencedIdentifiers,
+    ignoredIdentifiers,
+    isLazy,
+  };
 }
 
 function createMeta({
@@ -153,6 +159,48 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.diagram).toContain(
       "id_Main -->|Eager · singleton→transient · Class| id_RealDep",
     );
+  });
+
+  it("filters ignored helper identifiers from the graph", () => {
+    const lazyMeta = createMeta({
+      className: "LazyService",
+      filePath: "/src/lazy-service.ts",
+      scope: "transient",
+      identifierKey: "id_LazyService",
+    });
+
+    const consumer = createMeta({
+      className: "Consumer",
+      filePath: "/src/consumer.ts",
+      scope: "transient",
+      identifierKey: "id_Consumer",
+      dependencies: [
+        dep(
+          'Lazy(() => import("./lazy-service").then((m) => m.LazyService))',
+          ["Lazy", "import", "then", "m", "LazyService"],
+          true,
+          ["then", "m"],
+        ),
+      ],
+      referencedImports: [
+        {
+          name: "LazyService",
+          path: "./lazy-service",
+          originalName: "LazyService",
+        },
+      ],
+    });
+
+    const artifact = generateMermaidDiagram({
+      metas: [consumer, lazyMeta],
+    });
+
+    expect(artifact.edgeCount).toBe(1);
+    expect(artifact.diagram).toContain(
+      "id_Consumer -.->|Lazy · transient→transient · Class| id_LazyService",
+    );
+    expect(artifact.diagram).not.toContain("token_then");
+    expect(artifact.diagram).not.toContain("token_m");
   });
 
   it("applies custom diagram options", () => {

@@ -110,7 +110,7 @@ export function generateMermaidDiagram({
     ...options,
     scopeColors: {
       ...DEFAULT_SCOPE_COLORS,
-      ...(options?.scopeColors ?? {}),
+      ...options?.scopeColors,
     },
   };
 
@@ -312,9 +312,10 @@ function nodeFill(
 
 function gatherIdentifiers(dep: DependencyDescriptor): string[] {
   const identifiers = new Set<string>();
+  const ignored = new Set(dep.ignoredIdentifiers ?? []);
   for (const ident of dep.referencedIdentifiers ?? []) {
     const trimmed = ident.trim();
-    if (!trimmed || RESERVED_IDENTIFIERS.has(trimmed)) {
+    if (!trimmed || RESERVED_IDENTIFIERS.has(trimmed) || ignored.has(trimmed)) {
       continue;
     }
     identifiers.add(trimmed);
@@ -323,7 +324,11 @@ function gatherIdentifiers(dep: DependencyDescriptor): string[] {
   if (!identifiers.size) {
     for (const inferred of inferIdentifiersFromExpression(dep.expression)) {
       const trimmed = inferred.trim();
-      if (!trimmed || RESERVED_IDENTIFIERS.has(trimmed)) {
+      if (
+        !trimmed ||
+        RESERVED_IDENTIFIERS.has(trimmed) ||
+        ignored.has(trimmed)
+      ) {
         continue;
       }
       identifiers.add(trimmed);
