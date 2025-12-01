@@ -411,9 +411,6 @@ function resolveVisualizationOptions(
       mermaidOptions: undefined,
     };
   }
-  if (typeof mermaidConfig === "boolean" && mermaidConfig === false) {
-    return null;
-  }
   const { outputPath, ...rest } = mermaidConfig;
   const resolvedOutputPath = path.resolve(
     projectRoot,
