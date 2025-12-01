@@ -20,6 +20,11 @@ export default defineConfig(async () => {
         providers: ["src/providers.ts"],
         manifests: [manifest],
         lazyServices: [ReportingServiceIdentifier],
+        visualize: {
+          mermaid: {
+            outputPath: "./analytics/container.mmd",
+          },
+        },
       }),
       visualizer({
         gzipSize: true,

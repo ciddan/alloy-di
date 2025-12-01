@@ -71,4 +71,55 @@ describe("extractServiceMetadata", () => {
     const meta = extractServiceMetadata("Injectable", call, sourceFile);
     expect(meta.dependencies[0].expression).toBe("Dep");
   });
+
+  it("records ignored identifiers for Lazy dynamic import helpers", () => {
+    const { call, sourceFile } = getCallExpression(`
+      Injectable({
+        dependencies: () => [
+          Lazy(() => import("./lazy-service").then((module) => module.LazyService)),
+        ],
+      });
+    `);
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    const dep = meta.dependencies[0];
+    expect(dep.referencedIdentifiers).toContain("LazyService");
+    expect(dep.referencedIdentifiers).not.toContain("module");
+    expect(dep.referencedIdentifiers).not.toContain("then");
+    expect(dep.ignoredIdentifiers).toBeDefined();
+    expect(dep.ignoredIdentifiers).toEqual(
+      expect.arrayContaining(["module", "then"]),
+    );
+  });
+
+  it("ignores destructured helper bindings from Lazy imports", () => {
+    const { call, sourceFile } = getCallExpression(`
+      Injectable({
+        dependencies: () => [
+          Lazy(() =>
+            import("./lazy-service").then(({ LazyService: Impl }) => Impl),
+          ),
+        ],
+      });
+    `);
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    const dep = meta.dependencies[0];
+    expect(dep.ignoredIdentifiers).toBeDefined();
+    expect(dep.ignoredIdentifiers).toContain("Impl");
+  });
+
+  it("skips omitted array bindings when collecting helper identifiers", () => {
+    const { call, sourceFile } = getCallExpression(`
+      Injectable({
+        dependencies: () => [
+          Lazy(() =>
+            import("./lazy-service").then(([ , Impl ]) => Impl),
+          ),
+        ],
+      });
+    `);
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    const dep = meta.dependencies[0];
+    expect(dep.ignoredIdentifiers).toBeDefined();
+    expect(dep.ignoredIdentifiers).toContain("Impl");
+  });
 });

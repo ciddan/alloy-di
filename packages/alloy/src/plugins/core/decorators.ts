@@ -2,21 +2,59 @@ import ts from "typescript";
 import { ServiceScope } from "../../lib/scope";
 import type { DependencyDescriptor, ServiceMetadata } from "./types";
 
+function collectBindingIdentifiers(name: ts.BindingName, ignored: Set<string>) {
+  if (ts.isIdentifier(name)) {
+    ignored.add(name.text);
+    return;
+  }
+  name.elements.forEach((element) => {
+    if (ts.isOmittedExpression(element)) {
+      return;
+    }
+    collectBindingIdentifiers(element.name, ignored);
+  });
+}
+
+function isDynamicImportExpression(node: ts.CallExpression): boolean {
+  return node.expression.kind === ts.SyntaxKind.ImportKeyword;
+}
+
 function extractRefs(
   node: ts.Node,
   sourceFile: ts.SourceFile,
   identifiers: Set<string>,
+  ignored: Set<string>,
 ) {
   if (ts.isPropertyAssignment(node)) {
-    extractRefs(node.initializer, sourceFile, identifiers);
+    extractRefs(node.initializer, sourceFile, identifiers, ignored);
     if (ts.isComputedPropertyName(node.name)) {
-      extractRefs(node.name.expression, sourceFile, identifiers);
+      extractRefs(node.name.expression, sourceFile, identifiers, ignored);
     }
     return;
   }
 
+  if (ts.isParameter(node)) {
+    collectBindingIdentifiers(node.name, ignored);
+    if (node.initializer) {
+      extractRefs(node.initializer, sourceFile, identifiers, ignored);
+    }
+    return;
+  }
+
+  if (ts.isPropertyAccessExpression(node)) {
+    if (
+      ts.isCallExpression(node.expression) &&
+      isDynamicImportExpression(node.expression) &&
+      ts.isIdentifier(node.name)
+    ) {
+      ignored.add(node.name.text);
+    }
+  }
+
   if (ts.isIdentifier(node)) {
-    identifiers.add(node.text);
+    if (!ignored.has(node.text)) {
+      identifiers.add(node.text);
+    }
     return;
   }
 
@@ -24,13 +62,15 @@ function extractRefs(
     const name = node.expression.getText(sourceFile);
     if (name === "Lazy" || name.endsWith(".Lazy")) {
       node.arguments.forEach((arg) =>
-        extractRefs(arg, sourceFile, identifiers),
+        extractRefs(arg, sourceFile, identifiers, ignored),
       );
       return;
     }
   }
 
-  ts.forEachChild(node, (n) => extractRefs(n, sourceFile, identifiers));
+  ts.forEachChild(node, (n) =>
+    extractRefs(n, sourceFile, identifiers, ignored),
+  );
 }
 
 function createDependencyDescriptor(
@@ -39,6 +79,7 @@ function createDependencyDescriptor(
 ): DependencyDescriptor {
   const expression = node.getText(sourceFile);
   const referencedIdentifiers = new Set<string>();
+  const ignoredIdentifiers = new Set<string>();
   let isLazy = false;
 
   if (ts.isCallExpression(node)) {
@@ -48,11 +89,14 @@ function createDependencyDescriptor(
     }
   }
 
-  extractRefs(node, sourceFile, referencedIdentifiers);
+  extractRefs(node, sourceFile, referencedIdentifiers, ignoredIdentifiers);
 
   return {
     expression,
     referencedIdentifiers: Array.from(referencedIdentifiers),
+    ignoredIdentifiers: ignoredIdentifiers.size
+      ? Array.from(ignoredIdentifiers)
+      : undefined,
     isLazy,
   };
 }

@@ -24,6 +24,24 @@ import {
   augmentFactoryLazyServices,
   findDuplicateManifestServices,
 } from "./manifest-utils";
+import {
+  generateMermaidDiagram,
+  type MermaidDiagramOptions,
+} from "./visualizer";
+
+const DEFAULT_MERMAID_FILENAME = "alloy-di.mmd";
+
+export interface AlloyMermaidVisualizerOptions extends MermaidDiagramOptions {
+  outputPath?: string;
+}
+
+export interface AlloyVisualizationOptions {
+  /**
+   * Configure Mermaid diagram emission. Use `true` for defaults or provide
+   * overrides for layout, colors, or output path.
+   */
+  mermaid?: boolean | AlloyMermaidVisualizerOptions;
+}
 
 export interface AlloyPluginOptions {
   providers?: string[];
@@ -37,11 +55,21 @@ export interface AlloyPluginOptions {
    * Defaults to "./src".
    */
   containerDeclarationDir?: string;
+  /**
+   * Emit dependency graph artifacts. When `true`, writes a Mermaid diagram to
+   * `${projectRoot}/alloy-di.mmd`. Provide an object to customize output.
+   */
+  visualize?: boolean | AlloyVisualizationOptions;
 }
 
 interface ProviderModuleRef {
   absPath: string;
   importPath: string;
+}
+
+interface ResolvedVisualizationOptions {
+  outputPath: string;
+  mermaidOptions?: MermaidDiagramOptions;
 }
 
 function toLazyServiceKey(identifier: ServiceIdentifier): string {
@@ -65,6 +93,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   const providerModuleRefs: ProviderModuleRef[] = [];
   let resolvedRoot = process.cwd();
   let packageName = "UNKNOWN_PACKAGE";
+  let resolvedVisualization: ResolvedVisualizationOptions | null = null;
   const lazyServiceKeys = new Set(
     (options.lazyServices ?? []).map(toLazyServiceKey),
   );
@@ -128,6 +157,10 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           importPath: normalizeImportPath(absPath),
         });
       }
+      resolvedVisualization = resolveVisualizationOptions(
+        options.visualize,
+        resolvedRoot,
+      );
     },
 
     resolveId(id) {
@@ -334,7 +367,63 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         fs.writeFileSync(manifestsDtsPath, manifestsDts);
       }
 
+      if (resolvedVisualization) {
+        const artifact = generateMermaidDiagram({
+          metas,
+          lazyClassKeys: new Set(lazyReferencedClassKeys),
+          options: resolvedVisualization.mermaidOptions,
+        });
+        ensureDirectoryForFile(resolvedVisualization.outputPath);
+        fs.writeFileSync(
+          resolvedVisualization.outputPath,
+          `${artifact.diagram}\n`,
+        );
+      }
+
       return code;
     },
   };
+}
+
+function resolveVisualizationOptions(
+  input: AlloyPluginOptions["visualize"],
+  projectRoot: string,
+): ResolvedVisualizationOptions | null {
+  if (!input) {
+    return null;
+  }
+  if (typeof input === "boolean") {
+    return {
+      outputPath: path.resolve(projectRoot, DEFAULT_MERMAID_FILENAME),
+      mermaidOptions: undefined,
+    };
+  }
+  const mermaidConfig = input.mermaid;
+  if (!mermaidConfig) {
+    return null;
+  }
+  if (mermaidConfig === true) {
+    return {
+      outputPath: path.resolve(projectRoot, DEFAULT_MERMAID_FILENAME),
+      mermaidOptions: undefined,
+    };
+  }
+  const { outputPath, ...rest } = mermaidConfig;
+  const resolvedOutputPath = path.resolve(
+    projectRoot,
+    outputPath ?? DEFAULT_MERMAID_FILENAME,
+  );
+  const mermaidOptions =
+    Object.keys(rest).length > 0 ? (rest as MermaidDiagramOptions) : undefined;
+  return {
+    outputPath: resolvedOutputPath,
+    mermaidOptions,
+  };
+}
+
+function ensureDirectoryForFile(filePath: string) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }

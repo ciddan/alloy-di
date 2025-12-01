@@ -5,6 +5,7 @@
 ## Highlights
 
 - **Build-time graph** – services, scopes, and dependencies are resolved while bundling, so runtime work stays minimal.
+- **Visualize your DI graph** – enable the Vite plugin’s `visualize` option to emit a Mermaid diagram (`./alloy-di.mmd` by default) that captures scopes, lazy edges, and tokens for easy review.
 - **First-class lazy loading** – use `Lazy()` or provider-based lazy registrations to keep optional features in separate chunks.
 - **Framework agnostic** – works anywhere Vite runs: React, Vue, Svelte, SSR, libraries, and plain TS apps.
 - **Type safe** – generates `serviceIdentifiers` and manifest declarations for precise inference.
@@ -53,6 +54,31 @@ pnpm add -D alloy-di
 > **Build tip:** The default Vite scaffold (`pnpm create vite@latest`) wires `"build": "tsc && vite build"`. Alloy writes its ambient declarations during `vite build`, so running `tsc` first can fail on fresh trees. Swap the order (`vite build && tsc`), or manually run `vite build` to generate the declarations first.
 
 Need manifests, providers, or testing utilities? See the docs site for complete guides.
+
+## Visualize your dependency graph
+
+Enable the Vite plugin’s `visualize` option to have Alloy emit a Mermaid diagram that reflects every discovered service, scope, lazy edge, and token. By default the graph is written to `./alloy-di.mmd`, but you can customize the output path, color palette, or layout direction to fit your workflow.
+
+```ts
+import { defineConfig } from "vite";
+import alloy from "alloy-di/vite";
+
+export default defineConfig({
+  plugins: [
+    alloy({
+      visualize: {
+        mermaid: {
+          outputPath: "./docs/di-graph.mmd",
+          direction: "TB",
+          includeLegend: false,
+        },
+      },
+    }),
+  ],
+});
+```
+
+Commit the artifact for PR reviews, or generate ad-hoc previews locally with any Mermaid-friendly tool (for example VS Code’s Mermaid extension, GitHub’s Markdown preview, or `npx @mermaid-js/mermaid-cli -i docs/di-graph.mmd -o graph.svg`). The diagram highlights scopes, lazy edges, factory nodes, and tokens so you can inspect DI wiring at a glance.
 
 ## Documentation
 
