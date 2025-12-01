@@ -203,6 +203,91 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.diagram).not.toContain("token_m");
   });
 
+  it("infers dependency identifiers from promise expressions when metadata is empty", () => {
+    const lazyMeta = createMeta({
+      className: "LazyService",
+      filePath: "/src/lazy-service.ts",
+      scope: "transient",
+      identifierKey: "id_Lazy",
+    });
+
+    const consumer = createMeta({
+      className: "InferConsumer",
+      filePath: "/src/infer-consumer.ts",
+      scope: "singleton",
+      identifierKey: "id_InferConsumer",
+      dependencies: [
+        dep(
+          'Lazy(() => import("./lazy-service").then(module => module.LazyService))',
+          [],
+          true,
+        ),
+      ],
+    });
+
+    const artifact = generateMermaidDiagram({
+      metas: [consumer, lazyMeta],
+    });
+
+    expect(artifact.edgeCount).toBe(1);
+    expect(artifact.diagram).toContain(
+      "id_InferConsumer -.->|Lazy · singleton→transient · Class| id_Lazy",
+    );
+  });
+
+  it("deduplicates token nodes and trims long labels", () => {
+    const longToken = "ExternalToken".repeat(6);
+    const truncatedLabel = `${longToken.slice(0, 45)}…`;
+
+    const consumer = createMeta({
+      className: "TokenConsumer",
+      filePath: "/src/token-consumer.ts",
+      scope: "transient",
+      identifierKey: "id_TokenConsumer",
+      dependencies: [dep(longToken, [longToken]), dep(longToken, [longToken])],
+    });
+
+    const artifact = generateMermaidDiagram({
+      metas: [consumer],
+    });
+
+    expect(artifact.tokenCount).toBe(1);
+    expect(artifact.diagram).toContain(truncatedLabel);
+  });
+
+  it("resolves services imported via absolute paths", () => {
+    const absoluteMeta = createMeta({
+      className: "AbsoluteService",
+      filePath: "/lib/absolute.ts",
+      scope: "singleton",
+      identifierKey: "id_Absolute",
+    });
+
+    const consumer = createMeta({
+      className: "AbsoluteConsumer",
+      filePath: "/src/absolute-consumer.ts",
+      scope: "transient",
+      identifierKey: "id_AbsoluteConsumer",
+      dependencies: [dep("AbsoluteAlias", ["AbsoluteAlias"])],
+      referencedImports: [
+        {
+          name: "AbsoluteAlias",
+          path: "/lib/absolute.ts",
+          originalName: "AbsoluteService",
+        },
+      ],
+    });
+
+    const artifact = generateMermaidDiagram({
+      metas: [consumer, absoluteMeta],
+    });
+
+    expect(artifact.edgeCount).toBe(1);
+    expect(artifact.diagram).toContain(
+      "id_AbsoluteConsumer -->|Eager · transient→singleton · Class| id_Absolute",
+    );
+  });
+
   it("applies custom diagram options", () => {
     const singletonMeta = createMeta({
       className: "Root",

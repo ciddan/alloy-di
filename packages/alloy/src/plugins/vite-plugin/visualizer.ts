@@ -100,6 +100,11 @@ const RESERVED_IDENTIFIERS = new Set([
   "arguments",
 ]);
 
+/**
+ * Generates a Mermaid diagram depicting the dependency graph for the provided services.
+ * @param input - Discovered metadata, optional lazy keys, and rendering options.
+ * @returns The rendered diagram plus simple counts useful for reporting.
+ */
 export function generateMermaidDiagram({
   metas,
   lazyClassKeys,
@@ -259,12 +264,18 @@ export function generateMermaidDiagram({
   };
 }
 
+/**
+ * Produces a deterministic node identifier for a service, falling back to hashing the symbol key.
+ */
 function resolveNodeId(meta: DiscoveredMeta, index: number): string {
   const key =
     meta.identifierKey ?? createSymbolKey(meta.filePath, meta.className);
   return sanitizeMermaidId(key, index);
 }
 
+/**
+ * Normalizes arbitrary strings into Mermaid-safe identifiers, hashing when a leading letter is missing.
+ */
 function sanitizeMermaidId(source: string, fallbackIndex: number): string {
   const condensed = source.replace(/[^A-Za-z0-9_]/g, "_");
   if (condensed && /^[A-Za-z]/.test(condensed)) {
@@ -273,10 +284,16 @@ function sanitizeMermaidId(source: string, fallbackIndex: number): string {
   return `n_${hashString(`${fallbackIndex}:${source}`)}`;
 }
 
+/**
+ * Escapes problematic characters in labels so Mermaid renders them literally.
+ */
 function escapeMermaidLabel(label: string): string {
   return label.replace(/"/g, '\\"').replace(/\|/g, "/");
 }
 
+/**
+ * Builds a human-readable label describing the nature of an edge between two nodes.
+ */
 function describeEdge(
   from: GraphNode,
   to: GraphNode,
@@ -290,6 +307,9 @@ function describeEdge(
   return `${nature} · ${fromScope}→${toScope} · ${targetType}`;
 }
 
+/**
+ * Determines the fill color for a node based on its type, scope, and lazy/factory flags.
+ */
 function nodeFill(
   node: GraphNode,
   opts: typeof DEFAULT_OPTIONS,
@@ -310,6 +330,9 @@ function nodeFill(
   return undefined;
 }
 
+/**
+ * Collects unique identifiers for a dependency, falling back to expression parsing if metadata is absent.
+ */
 function gatherIdentifiers(dep: DependencyDescriptor): string[] {
   const identifiers = new Set<string>();
   const ignored = new Set(dep.ignoredIdentifiers ?? []);
@@ -338,6 +361,9 @@ function gatherIdentifiers(dep: DependencyDescriptor): string[] {
   return Array.from(identifiers);
 }
 
+/**
+ * Heuristically extracts likely identifier names from common Lazy import expressions.
+ */
 function inferIdentifiersFromExpression(expression: string): string[] {
   const matches = new Set<string>();
   const thenPattern =
@@ -355,6 +381,9 @@ function inferIdentifiersFromExpression(expression: string): string[] {
   return Array.from(matches);
 }
 
+/**
+ * Resolves a dependency identifier to known service nodes, or creates a token node when unresolved.
+ */
 function resolveTargetsForIdentifier(
   identifier: string,
   fallbackExpression: string,
@@ -382,6 +411,9 @@ function resolveTargetsForIdentifier(
   return [ensureTokenNode(tokenNodes, tokenLabel)];
 }
 
+/**
+ * Attempts to find service nodes that match an identifier via import metadata or class names.
+ */
 function resolveServiceTargets(
   identifier: string,
   meta: DiscoveredMeta,
@@ -439,6 +471,9 @@ function resolveServiceTargets(
   return matches;
 }
 
+/**
+ * Normalizes an import specifier relative to the source file, supporting relative, absolute, and bare paths.
+ */
 function resolveImportSpecifierPath(
   sourceFilePath: string,
   specifier: string,
@@ -456,6 +491,9 @@ function resolveImportSpecifierPath(
   return normalizeImportPath(specifier);
 }
 
+/**
+ * Retrieves an existing token node or creates a new one with a sanitized identifier.
+ */
 function ensureTokenNode(
   tokenNodes: Map<string, GraphNode>,
   label: string,
@@ -478,6 +516,9 @@ function ensureTokenNode(
   return node;
 }
 
+/**
+ * Condenses arbitrary strings into stable token labels, truncating overly long values.
+ */
 function createTokenLabel(raw: string): string {
   const condensed = raw.replace(/\s+/g, " ").trim();
   if (!condensed) {
@@ -486,6 +527,9 @@ function createTokenLabel(raw: string): string {
   return condensed.length > 48 ? `${condensed.slice(0, 45)}…` : condensed;
 }
 
+/**
+ * Chooses the appropriate edge color based on laziness and whether the target is produced by a factory.
+ */
 function selectEdgeColor(
   isLazy: boolean,
   target: GraphNode,
