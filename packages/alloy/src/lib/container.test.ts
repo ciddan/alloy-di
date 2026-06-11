@@ -351,4 +351,32 @@ describe("Container", () => {
       ProviderPlaceholder as unknown as Newable<unknown>,
     );
   });
+  it("does not memoize missing metadata across late registrations", async () => {
+    class LateDependency {}
+
+    class LateRegisteredService {
+      constructor(public dep: LateDependency) {}
+    }
+
+    const first = await container.get(LateRegisteredService);
+    expect(first.dep).toBeUndefined();
+
+    dependenciesRegistry.set(LateDependency, {
+      scope: ServiceScope.TRANSIENT,
+      dependencies: () => [],
+    });
+    dependenciesRegistry.set(LateRegisteredService, {
+      scope: ServiceScope.TRANSIENT,
+      dependencies: () => [LateDependency],
+    });
+
+    const second = await container.get(LateRegisteredService);
+
+    expect(second.dep).toBeInstanceOf(LateDependency);
+
+    dependenciesRegistry.delete(
+      LateRegisteredService as unknown as Newable<unknown>,
+    );
+    dependenciesRegistry.delete(LateDependency as unknown as Newable<unknown>);
+  });
 });
