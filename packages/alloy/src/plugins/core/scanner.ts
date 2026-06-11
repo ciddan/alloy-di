@@ -1,6 +1,7 @@
+import fs from "node:fs";
 import ts, { SyntaxKind } from "typescript";
 import { extractServiceMetadata } from "./decorators";
-import { processLazyCall } from "./lazy";
+import { processLazyCall, resolveModuleSpecifierCandidates } from "./lazy";
 import { createClassKey, createSymbolKey } from "./utils";
 import type { DiscoveredMeta } from "./types";
 
@@ -14,6 +15,17 @@ interface ImportInfo {
   originalName?: string;
   isTypeOnly?: boolean;
 }
+
+type AlloyDecoratorName = "Injectable" | "Singleton";
+
+interface ServiceDecoratorMatch {
+  decoratorCall: ts.CallExpression;
+  decoratorName: AlloyDecoratorName;
+}
+
+type DecoratorResolutionCache = Map<string, AlloyDecoratorName | null>;
+
+const ALLOY_RUNTIME_MODULE = "alloy-di/runtime";
 
 function collectFileImports(
   sourceFile: ts.SourceFile,
@@ -76,6 +88,7 @@ export function scanSource(code: string, id: string): ScanResult {
   const discovered = new Map<string, DiscoveredMeta>();
   const lazyRefs = new Set<string>();
   const fileImports = collectFileImports(sourceFile);
+  const decoratorResolutionCache: DecoratorResolutionCache = new Map();
 
   const visit = (node: ts.Node) => {
     if (ts.isClassDeclaration(node)) {
@@ -84,6 +97,7 @@ export function scanSource(code: string, id: string): ScanResult {
         sourceFile,
         fileImports,
         discovered,
+        decoratorResolutionCache,
       });
     } else if (ts.isCallExpression(node)) {
       processLazyCall(node, id, sourceFile, lazyRefs);
@@ -100,6 +114,7 @@ interface ClassVisitContext {
   sourceFile: ts.SourceFile;
   fileImports: Map<string, ImportInfo>;
   discovered: Map<string, DiscoveredMeta>;
+  decoratorResolutionCache: DecoratorResolutionCache;
 }
 
 function handleClassDeclaration(
@@ -109,11 +124,17 @@ function handleClassDeclaration(
   if (!node.name) {
     return;
   }
-  const decoratorCall = findServiceDecorator(node, context.sourceFile);
-  if (!decoratorCall) {
+  const decoratorMatch = findServiceDecorator(
+    node,
+    context.sourceFile,
+    context.fileImports,
+    context.id,
+    context.decoratorResolutionCache,
+  );
+  if (!decoratorMatch) {
     return;
   }
-  const decoratorName = decoratorCall.expression.getText(context.sourceFile);
+  const { decoratorCall, decoratorName } = decoratorMatch;
   const className = node.name.getText(context.sourceFile);
   const metadata = extractServiceMetadata(
     decoratorName,
@@ -137,7 +158,10 @@ function handleClassDeclaration(
 function findServiceDecorator(
   node: ts.ClassDeclaration,
   sourceFile: ts.SourceFile,
-): ts.CallExpression | undefined {
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  resolutionCache: DecoratorResolutionCache,
+): ServiceDecoratorMatch | undefined {
   const decorators = ts.getDecorators ? ts.getDecorators(node) : undefined;
   if (!decorators?.length) {
     return undefined;
@@ -146,12 +170,225 @@ function findServiceDecorator(
     if (!ts.isCallExpression(decorator.expression)) {
       continue;
     }
-    const name = decorator.expression.expression.getText(sourceFile);
-    if (name.endsWith("Injectable") || name.endsWith("Singleton")) {
-      return decorator.expression;
+    const decoratorName = resolveDecoratorName(
+      decorator.expression.expression,
+      fileImports,
+      id,
+      new Set([id]),
+      resolutionCache,
+    );
+    if (decoratorName) {
+      return {
+        decoratorCall: decorator.expression,
+        decoratorName,
+      };
     }
   }
   return undefined;
+}
+
+function resolveDecoratorName(
+  expression: ts.LeftHandSideExpression,
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
+): AlloyDecoratorName | undefined {
+  if (ts.isIdentifier(expression)) {
+    const importInfo = fileImports.get(expression.text);
+    if (!importInfo || importInfo.isTypeOnly) {
+      return undefined;
+    }
+    return resolveImportedDecorator(
+      importInfo.path,
+      importInfo.originalName ?? expression.text,
+      id,
+      visitedModules,
+      resolutionCache,
+    );
+  }
+
+  if (
+    ts.isPropertyAccessExpression(expression) &&
+    ts.isIdentifier(expression.expression)
+  ) {
+    const importInfo = fileImports.get(expression.expression.text);
+    if (
+      !importInfo ||
+      importInfo.isTypeOnly ||
+      importInfo.originalName !== "*"
+    ) {
+      return undefined;
+    }
+    return resolveImportedDecorator(
+      importInfo.path,
+      expression.name.text,
+      id,
+      visitedModules,
+      resolutionCache,
+    );
+  }
+
+  return undefined;
+}
+
+function resolveImportedDecorator(
+  importPath: string,
+  requestedName: string,
+  fromId: string,
+  visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
+): AlloyDecoratorName | undefined {
+  if (importPath === ALLOY_RUNTIME_MODULE) {
+    return isAlloyDecoratorName(requestedName) ? requestedName : undefined;
+  }
+
+  if (!importPath.startsWith(".")) {
+    return undefined;
+  }
+
+  for (const candidate of resolveModuleSpecifierCandidates(
+    fromId,
+    importPath,
+  )) {
+    if (visitedModules.has(candidate) || !fs.existsSync(candidate)) {
+      continue;
+    }
+    const cacheKey = `${candidate}:${requestedName}`;
+    const cached = resolutionCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    if (cached === null) {
+      continue;
+    }
+    visitedModules.add(candidate);
+    try {
+      const source = fs.readFileSync(candidate, "utf8");
+      const sourceFile = ts.createSourceFile(
+        candidate,
+        source,
+        ts.ScriptTarget.ESNext,
+        true,
+      );
+      const fileImports = collectFileImports(sourceFile);
+      const resolved = resolveDecoratorExport(
+        requestedName,
+        sourceFile,
+        fileImports,
+        candidate,
+        visitedModules,
+        resolutionCache,
+      );
+      resolutionCache.set(cacheKey, resolved ?? null);
+      if (resolved) {
+        return resolved;
+      }
+    } catch {
+      continue;
+    } finally {
+      visitedModules.delete(candidate);
+    }
+  }
+
+  return undefined;
+}
+
+function resolveDecoratorExport(
+  requestedName: string,
+  sourceFile: ts.SourceFile,
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
+): AlloyDecoratorName | undefined {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isExportDeclaration(statement)) {
+      continue;
+    }
+
+    const moduleSpecifier =
+      statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
+        ? statement.moduleSpecifier.text
+        : undefined;
+
+    if (!statement.exportClause) {
+      if (!moduleSpecifier) {
+        continue;
+      }
+      const resolved = resolveImportedDecorator(
+        moduleSpecifier,
+        requestedName,
+        id,
+        visitedModules,
+        resolutionCache,
+      );
+      if (resolved) {
+        return resolved;
+      }
+      continue;
+    }
+
+    if (!ts.isNamedExports(statement.exportClause)) {
+      continue;
+    }
+
+    for (const element of statement.exportClause.elements) {
+      if (element.name.text !== requestedName) {
+        continue;
+      }
+      const resolved = resolveNamedExportElement(
+        element,
+        moduleSpecifier,
+        fileImports,
+        id,
+        visitedModules,
+        resolutionCache,
+      );
+      if (resolved) {
+        return resolved;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function resolveNamedExportElement(
+  element: ts.ExportSpecifier,
+  moduleSpecifier: string | undefined,
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
+): AlloyDecoratorName | undefined {
+  const sourceName = element.propertyName?.text ?? element.name.text;
+
+  if (moduleSpecifier) {
+    return resolveImportedDecorator(
+      moduleSpecifier,
+      sourceName,
+      id,
+      visitedModules,
+      resolutionCache,
+    );
+  }
+
+  const importInfo = fileImports.get(sourceName);
+  if (!importInfo || importInfo.isTypeOnly) {
+    return undefined;
+  }
+  return resolveImportedDecorator(
+    importInfo.path,
+    importInfo.originalName ?? sourceName,
+    id,
+    visitedModules,
+    resolutionCache,
+  );
+}
+
+function isAlloyDecoratorName(name: string): name is AlloyDecoratorName {
+  return name === "Injectable" || name === "Singleton";
 }
 
 function collectReferencedImports(

@@ -44,6 +44,9 @@ function readManifest(
   return JSON.parse(match[1]) as AlloyManifest;
 }
 
+const INJECTABLE_IMPORT = `import { Injectable } from "alloy-di/runtime";`;
+const INJECTABLE_LAZY_DEPS_IMPORT = `import { Injectable, Lazy, deps } from "alloy-di/runtime";`;
+
 describe("manifest-plugin", () => {
   it("marks missing exports in bundled mode", () => {
     const files: Record<string, string> = {
@@ -51,10 +54,8 @@ describe("manifest-plugin", () => {
       "/src/svc-a.ts": `@Injectable()\nexport class ExportedService {}`,
       "/src/svc-b.ts": `@Injectable()\nexport class HiddenService {}`,
     };
-    // Minimal decorator stubs so scanner sees them.
-    const decoratorStub = `function Injectable() { return (c:any)=>{} }`;
     for (const k of Object.keys(files)) {
-      files[k] = decoratorStub + "\n" + files[k];
+      files[k] = INJECTABLE_IMPORT + "\n" + files[k];
     }
     const emitted = runPlugin(files);
     expect(emitted.length).toBe(2);
@@ -72,9 +73,8 @@ describe("manifest-plugin", () => {
       "/src/a.ts": `@Injectable()\nexport class A {}`,
       "/src/b.ts": `@Injectable()\nexport class B {}`,
     };
-    const decoratorStub = `function Injectable() { return (c:any)=>{} }`;
     for (const k of Object.keys(files)) {
-      files[k] = decoratorStub + "\n" + files[k];
+      files[k] = INJECTABLE_IMPORT + "\n" + files[k];
     }
     const emitted = runPlugin(files);
     const source = emitted.find((f) =>
@@ -88,9 +88,8 @@ describe("manifest-plugin", () => {
     const files: Record<string, string> = {
       "/src/feature/service.ts": `@Injectable()\nexport class PM {}`,
     };
-    const decoratorStub = `function Injectable() { return (c:any)=>{} }`;
     for (const k of Object.keys(files)) {
-      files[k] = decoratorStub + "\n" + files[k];
+      files[k] = INJECTABLE_IMPORT + "\n" + files[k];
     }
     const emitted = runPlugin(files, { preserveModules: true });
     const src = emitted.find((f) =>
@@ -106,9 +105,8 @@ describe("manifest-plugin", () => {
       "/src/a.ts": `@Injectable()\nexport class Dup {}`,
       "/src/b.ts": `@Injectable()\nexport class Dup {}`,
     };
-    const decoratorStub = `function Injectable() { return (c:any)=>{} }`;
     for (const k of Object.keys(files)) {
-      files[k] = decoratorStub + "\n" + files[k];
+      files[k] = INJECTABLE_IMPORT + "\n" + files[k];
     }
     const emitted = runPlugin(files);
     const src = emitted.find((f) =>
@@ -120,7 +118,7 @@ describe("manifest-plugin", () => {
 
   it("fallback to fs write when emitFile is missing", () => {
     const files: Record<string, string> = {
-      "/src/svc.ts": `function Injectable(){return (c:any)=>{}}\n@Injectable()\nexport class S {}`,
+      "/src/svc.ts": `${INJECTABLE_IMPORT}\n@Injectable()\nexport class S {}`,
     };
     const plugin = alloy({ fileName: "alloy.test.manifest.mjs" });
     for (const [id, code] of Object.entries(files)) {
@@ -165,9 +163,8 @@ describe("manifest-plugin", () => {
       "/src/analytics.ts": `@Injectable()\nexport class Analytics {}`,
       "/src/reporting.ts": `@Injectable(deps(Lazy(() => import('./analytics').then(m => m.Analytics))))\nexport class Reporter {}`,
     };
-    const stubs = `function Injectable(){return (c:any)=>{}}\nfunction Lazy(x:any){return x}\nfunction deps(...i:any[]){return ()=> i}`;
     for (const k of Object.keys(files)) {
-      files[k] = stubs + "\n" + files[k];
+      files[k] = INJECTABLE_LAZY_DEPS_IMPORT + "\n" + files[k];
     }
     const emitted = runPlugin(files);
     const manifest = readManifest(emitted);
@@ -195,9 +192,8 @@ describe("manifest-plugin", () => {
         export class Consumer {}
       `,
     };
-    const stubs = `function Injectable(){return (c:any)=>{}}\nfunction Lazy(x:any,y?:any){return x}\nfunction deps(...i:any[]){return ()=> i}`;
     for (const k of Object.keys(files)) {
-      files[k] = stubs + "\n" + files[k];
+      files[k] = INJECTABLE_LAZY_DEPS_IMPORT + "\n" + files[k];
     }
 
     const manifest = readManifest(runPlugin(files, { preserveModules: true }));
@@ -231,9 +227,8 @@ describe("manifest-plugin", () => {
         export class Second {}
       `,
     };
-    const stubs = `function Injectable(){return (c:any)=>{}}\nfunction Lazy(x:any,y?:any){return x}\nfunction deps(...i:any[]){return ()=> i}`;
     for (const k of Object.keys(files)) {
-      files[k] = stubs + "\n" + files[k];
+      files[k] = INJECTABLE_LAZY_DEPS_IMPORT + "\n" + files[k];
     }
 
     const manifest = readManifest(runPlugin(files, { preserveModules: true }));
@@ -250,7 +245,7 @@ describe("manifest-plugin", () => {
   it("emits providers in preserve-modules mode", () => {
     const files: Record<string, string> = {
       "/src/index.ts": `export { Reporter } from './reporting';`,
-      "/src/reporting.ts": `function Injectable(){return (c:any)=>{}}\nexport class Reporter {}`,
+      "/src/reporting.ts": `${INJECTABLE_IMPORT}\n@Injectable()\nexport class Reporter {}`,
       "/src/providers.ts": `export default {}`,
     };
     const emitted = runPlugin(
@@ -270,7 +265,7 @@ describe("manifest-plugin", () => {
   it("throws when providers used without preserveModules", () => {
     const files: Record<string, string> = {
       "/src/index.ts": `export { Reporter } from './reporting';`,
-      "/src/reporting.ts": `function Injectable(){return (c:any)=>{}}\nexport class Reporter {}`,
+      "/src/reporting.ts": `${INJECTABLE_IMPORT}\n@Injectable()\nexport class Reporter {}`,
       "/src/providers.ts": `export default {}`,
     };
     expect(() =>
