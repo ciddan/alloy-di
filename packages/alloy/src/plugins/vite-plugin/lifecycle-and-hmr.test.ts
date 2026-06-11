@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { alloy } from "./index";
+import {
+  applyBuildStart,
+  applyConfigResolved,
+  applyHotUpdate,
+  applyTransform,
+  loadContainer,
+  resolveVirtualId,
+} from "./test-utils";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -13,27 +21,22 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
             @Injectable()
             export class TempService {}
         `;
-    // @ts-expect-error - calling transform for testing
-    plugin.transform(initial, id);
-    // @ts-expect-error - calling load for testing
-    const firstGen = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, initial, id);
+    const firstGen = await loadContainer(plugin, "\0virtual:alloy-container");
     expect(firstGen).toMatchSnapshot();
 
     const afterRemoval = `
             // decorator removed
             export class TempService {}
         `;
-    // @ts-expect-error - calling transform for testing
-    plugin.transform(afterRemoval, id);
-    // @ts-expect-error - calling load for testing
-    const secondGen = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, afterRemoval, id);
+    const secondGen = await loadContainer(plugin, "\0virtual:alloy-container");
     expect(secondGen).toMatchSnapshot();
   });
 
   it("resolveId returns resolved virtual id for virtual:alloy-container", () => {
     const plugin = alloy();
-    // @ts-expect-error calling hook directly
-    const resolved = plugin.resolveId("virtual:alloy-container");
+    const resolved = resolveVirtualId(plugin, "virtual:alloy-container");
     expect(resolved).toBe("\0virtual:alloy-container");
   });
 
@@ -43,10 +46,7 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
     // Setup fake root to prevent walkSync from finding real files
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-hmr-"));
     fs.mkdirSync(path.join(tmpDir, "src"));
-    if (plugin.configResolved) {
-      // @ts-expect-error
-      plugin.configResolved({ root: tmpDir });
-    }
+    applyConfigResolved(plugin, { root: tmpDir });
 
     const code = `
       import { Injectable } from 'alloy-di/runtime';
@@ -54,12 +54,10 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
       export class ToBeCleared {}
     `;
     const id = "/src/clear-me.ts";
-    // @ts-expect-error - calling transform for testing
-    plugin.transform(code, id);
-    // @ts-expect-error - calling buildStart for testing
-    plugin.buildStart();
-    // @ts-expect-error - calling load for testing
-    const generatedCode = (await plugin.load(
+    applyTransform(plugin, code, id);
+    applyBuildStart(plugin);
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generatedCode).toContain("const container = new Container()");
@@ -67,7 +65,7 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
     expect(generatedCode).not.toContain("ctor:");
   });
 
-  it("handleHotUpdate removes classes on unlink (no modules)", async () => {
+  it("hotUpdate removes classes on unlink (no modules in any graph)", async () => {
     const plugin = alloy();
     const id = "/src/hmr-unlink.ts";
     const code = `
@@ -75,13 +73,11 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
       @Injectable()
       export class HmrGone {}
     `;
-    // @ts-expect-error - calling transform for testing
-    plugin.transform(code, id);
-    // @ts-expect-error - calling handleHotUpdate for testing
-    const mods = plugin.handleHotUpdate({ file: id, modules: [] });
+    applyTransform(plugin, code, id);
+    const mods = applyHotUpdate(plugin, { file: id });
     expect(mods).toEqual([]);
-    // @ts-expect-error - calling load for testing
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generatedCode).not.toMatch(/HmrGone/);
@@ -89,7 +85,6 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
 
   it("load returns undefined for non-virtual ids", async () => {
     const plugin = alloy();
-    // @ts-expect-error - calling load for testing
-    expect(await plugin.load("/some/other/id.ts")).toBeUndefined();
+    expect(await loadContainer(plugin, "/some/other/id.ts")).toBeUndefined();
   });
 });

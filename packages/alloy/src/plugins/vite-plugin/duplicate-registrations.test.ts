@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "path";
 import { alloy } from "./index";
+import { applyTransform, loadContainer } from "./test-utils";
 
 describe("Duplicate registration guard", () => {
   it("throws when a service is discovered locally and provided via manifest", async () => {
@@ -42,12 +43,10 @@ describe("Duplicate registration guard", () => {
       export class Svc {}
     `;
     const id = "/src/svc.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
+    applyTransform(plugin, code, id);
 
-    // @ts-expect-error testing load
-    await expect(plugin.load("\0virtual:alloy-container")).rejects.toThrow(
-      /Duplicate service registrations detected/,
-    );
+    await expect(
+      loadContainer(plugin, "\0virtual:alloy-container"),
+    ).rejects.toThrow(/Duplicate service registrations detected/);
   });
 });

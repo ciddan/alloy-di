@@ -1,4 +1,4 @@
 {
   "**/*.{js,ts}": "oxlint",
-  "**/*.{js,ts,md,json,yaml}": "prettier --write"
+  "**/*.{js,ts,md,json,yaml}": "oxfmt"
 }

@@ -1,9 +1,11 @@
 {
-  "extends": ["oxlint:defaults"],
   "rules": {
     "block-scoped-var": "error",
     "consistent-function-scoping": "error",
-    "curly": ["error", "all"],
+    "curly": [
+      "error",
+      "all"
+    ],
     "no-absolute-path": "error",
     "no-accessor-recursion": "error",
     "no-array-reverse": "error",
@@ -46,7 +48,10 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
       "rules": {
         "no-extraneous-class": "off",
         "no-unsafe-type-assertion": "off",

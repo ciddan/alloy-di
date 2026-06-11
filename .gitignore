@@ -32,6 +32,7 @@ pnpm-debug.log*
 .tmp/
 temp/
 tmp/
+docs/.vitepress/.temp
 
 # OS generated files
 .DS_Store

@@ -4,6 +4,11 @@ import os from "node:os";
 import path from "path";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import { alloy } from "./index";
+import {
+  applyConfigResolved,
+  applyTransform,
+  loadContainer,
+} from "./test-utils";
 
 const serviceCIdentifier = Symbol.for(
   "alloy:UNKNOWN_PACKAGE/src/service-c.ts#ServiceC",
@@ -16,11 +21,7 @@ describe("Vite Plugin Alloy - lazyServices option", () => {
       lazyServices: [serviceCIdentifier],
       containerDeclarationDir: tmpDir,
     });
-    const hook = plugin.configResolved;
-    if (hook) {
-      // @ts-expect-error testing hook
-      hook({ root: "/" });
-    }
+    applyConfigResolved(plugin, { root: "/" });
 
     const code = `
       import { Injectable } from 'alloy-di/runtime';
@@ -30,10 +31,9 @@ describe("Vite Plugin Alloy - lazyServices option", () => {
       export class ServiceC {}
     `;
     const id = "/src/service-c.ts";
-    // @ts-expect-error test transform invocation
-    plugin.transform(code, id);
-    // @ts-expect-error test load invocation
-    const generated = (await plugin.load(
+    applyTransform(plugin, code, id);
+    const generated = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generated).toMatch(/factory: Lazy\(.*ServiceC/);

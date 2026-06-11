@@ -195,7 +195,7 @@ export function asLazyClass<T, const TDeps extends DependenciesOption>(
       );
     }
   }
-  // oxlint-disable-next-line: no-unsafe-type-assertion -- placeholder intentionally masquerades as the target service constructor for dependency declarations.
+  // oxlint-disable-next-line no-unsafe-type-assertion -- placeholder intentionally masquerades as the target service constructor for dependency declarations.
   const placeholder = AlloyLazyProvider as unknown as LazyPlaceholder<T>;
   if (options.label) {
     Object.defineProperty(placeholder, "name", {
@@ -211,7 +211,7 @@ export function asLazyClass<T, const TDeps extends DependenciesOption>(
   Object.defineProperty(placeholder, LAZY_PROVIDER_DESCRIPTOR, {
     value: {
       placeholder,
-      // oxlint-disable-next-line: no-unsafe-type-assertion -- coercing the Lazy wrapper to reference a constructor import rather than an instance.
+      // oxlint-disable-next-line no-unsafe-type-assertion -- coercing the Lazy wrapper to reference a constructor import rather than an instance.
       factory: factory as Lazy<Newable<T>>,
       lifecycle: options.lifecycle,
       deps: options.deps,

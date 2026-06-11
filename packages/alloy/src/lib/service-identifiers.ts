@@ -19,7 +19,7 @@ function formatIdentifierDescription(ctor: Constructor): string {
 }
 
 function createServiceIdentifier(ctor: Constructor): ServiceIdentifier {
-  // oxlint-disable-next-line: no-unsafe-type-assertion
+  // oxlint-disable-next-line no-unsafe-type-assertion
   return Symbol(formatIdentifierDescription(ctor)) as ServiceIdentifier;
 }
 
@@ -43,13 +43,13 @@ export function registerServiceIdentifier<T>(
         );
       }
     }
-    // oxlint-disable-next-line: no-unsafe-type-assertion
+    // oxlint-disable-next-line no-unsafe-type-assertion
     return current as ServiceIdentifier<T>;
   }
 
   const identifier =
     explicitIdentifier ??
-    // oxlint-disable-next-line: no-unsafe-type-assertion
+    // oxlint-disable-next-line no-unsafe-type-assertion
     (createServiceIdentifier(ctor) as ServiceIdentifier<T>);
   const existingOwner = identifierToCtor.get(identifier);
   if (existingOwner && existingOwner !== ctor) {

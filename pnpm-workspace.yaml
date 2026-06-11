@@ -3,8 +3,9 @@ packages:
   - packages/alloy
   - packages/examples/*
 
-minimumReleaseAge: 1440
+allowBuilds:
+  "@parcel/watcher": true
+  esbuild: true
+  simple-git-hooks: true
 
-onlyBuiltDependencies:
-  - esbuild
-  - simple-git-hooks
+minimumReleaseAge: 1440

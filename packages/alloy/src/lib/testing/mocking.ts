@@ -172,7 +172,7 @@ function buildMockCtorFrom<T>(
   realCtor: Newable<T>,
   mock: MockOf<T>,
 ): Newable<T> {
-  // oxlint-disable-next-line: unicorn/consistent-function-scoping
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
   function MockCtor() {}
   const proto = realCtor.prototype as Record<string, unknown>;
   for (const key of Object.getOwnPropertyNames(proto)) {
