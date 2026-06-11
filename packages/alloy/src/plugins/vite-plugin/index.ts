@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import type { Plugin, ViteDevServer } from "vite";
+import type { Plugin } from "vite";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import {
   generateContainerModule,
@@ -8,8 +8,7 @@ import {
   generateManifestTypeDefinition,
 } from "../core/codegen";
 import type { AlloyManifest, DiscoveredMeta } from "../core/types";
-import { createClassKey, normalizeImportPath, walkSync } from "../core/utils";
-import { createDiscoveryStore } from "../core/discovery-store";
+import { normalizeImportPath, walkSync } from "../core/utils";
 import { IdentifierResolver } from "../core/identifier-resolver";
 import {
   readManifests,
@@ -32,6 +31,11 @@ export type {
   AlloyMermaidVisualizerOptions,
   AlloyVisualizationOptions,
 } from "./visualization-utils";
+import {
+  createDiscoveryRuntime,
+  invalidateContainerModule,
+  isDiscoverableFile,
+} from "./discovery-runtime";
 
 export interface AlloyPluginOptions {
   providers?: string[];
@@ -67,50 +71,6 @@ function toLazyServiceKey(identifier: ServiceIdentifier): string {
   return description;
 }
 
-/** Files the discovery scanner processes (mirrors the transform hook filter). */
-function isDiscoverableFile(file: string): boolean {
-  return (
-    /\.tsx?$/i.test(file) &&
-    !/\.d\.ts$/i.test(file) &&
-    !file.includes("node_modules")
-  );
-}
-
-/**
- * Serializes the codegen-relevant fields of a file's discovered metas so two
- * scans can be compared. Changes here (added/removed services, scope, deps,
- * factory, or resolved imports) mean the generated container must be rebuilt;
- * edits that leave them untouched (e.g. a method body) should not.
- */
-function metasSignature(metas: readonly DiscoveredMeta[]): string {
-  return JSON.stringify(
-    metas.map((m) => ({
-      className: m.className,
-      filePath: m.filePath,
-      scope: m.metadata.scope,
-      factory: m.metadata.factory?.expression ?? null,
-      dependencies: m.metadata.dependencies.map((d) => ({
-        expression: d.expression,
-        isLazy: d.isLazy,
-        referencedIdentifiers: d.referencedIdentifiers,
-      })),
-      referencedImports: (m.referencedImports ?? []).map((r) => ({
-        name: r.name,
-        path: r.path,
-        originalName: r.originalName ?? null,
-        isTypeOnly: Boolean(r.isTypeOnly),
-      })),
-    })),
-  );
-}
-
-function lazyKeysSignature(keys: Set<string> | undefined): string {
-  if (!keys || keys.size === 0) {
-    return "";
-  }
-  return Array.from(keys).toSorted().join("|");
-}
-
 /**
  * Creates the Alloy Vite plugin that statically discovers injectable classes
  * and exposes them through a virtual container module at build time.
@@ -126,86 +86,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   const lazyServiceKeys = new Set(
     (options.lazyServices ?? []).map(toLazyServiceKey),
   );
-
-  const discovery = createDiscoveryStore();
-  // Discovery registries
-  const discoveredClasses = new Map<string, DiscoveredMeta>();
-  const lazyReferencedClassKeys = new Set<string>();
-
-  /**
-   * Re-scan a file and reconcile its contribution to the discovery registries.
-   * Returns whether the file's codegen-relevant discovery output changed.
-   */
-  const processUpdate = (id: string, code: string): boolean => {
-    const { metas, lazyClassKeys, previousMetas, previousLazyClassKeys } =
-      discovery.updateFile(id, code);
-
-    if (previousMetas) {
-      for (const meta of previousMetas) {
-        discoveredClasses.delete(createClassKey(meta.filePath, meta.className));
-      }
-    }
-
-    for (const meta of metas) {
-      discoveredClasses.set(
-        createClassKey(meta.filePath, meta.className),
-        meta,
-      );
-    }
-
-    if (previousLazyClassKeys) {
-      for (const key of previousLazyClassKeys) {
-        lazyReferencedClassKeys.delete(key);
-      }
-    }
-    if (lazyClassKeys.size) {
-      for (const key of lazyClassKeys) {
-        lazyReferencedClassKeys.add(key);
-      }
-    }
-
-    return (
-      metasSignature(previousMetas ?? []) !== metasSignature(metas) ||
-      lazyKeysSignature(previousLazyClassKeys) !==
-        lazyKeysSignature(lazyClassKeys)
-    );
-  };
-
-  /**
-   * Drop a file's discovered metadata. Returns whether anything was removed
-   * (i.e. whether the generated container needs to be rebuilt).
-   */
-  const removeDiscoveredFile = (file: string): boolean => {
-    const removed = discovery.removeFile(file);
-    if (removed.previousMetas) {
-      for (const meta of removed.previousMetas) {
-        discoveredClasses.delete(createClassKey(meta.filePath, meta.className));
-      }
-    }
-    if (removed.previousLazyClassKeys) {
-      for (const key of removed.previousLazyClassKeys) {
-        lazyReferencedClassKeys.delete(key);
-      }
-    }
-    return Boolean(
-      removed.previousMetas?.length || removed.previousLazyClassKeys?.size,
-    );
-  };
-
-  /**
-   * Invalidate the generated container module in every environment's module
-   * graph so its `load` hook re-runs and regenerates from current discovery.
-   */
-  const invalidateContainerModule = (server: ViteDevServer): void => {
-    for (const environment of Object.values(server.environments)) {
-      const mod = environment.moduleGraph.getModuleById(
-        resolvedVirtualModuleId,
-      );
-      if (mod) {
-        environment.moduleGraph.invalidateModule(mod);
-      }
-    }
-  };
+  const discoveryRuntime = createDiscoveryRuntime();
 
   return {
     name: "vite-plugin-alloy",
@@ -261,7 +142,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         },
       },
       handler(code, id) {
-        processUpdate(id, code);
+        discoveryRuntime.processUpdate(id, code);
         return null;
       },
     },
@@ -279,7 +160,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
       let discoveryChanged: boolean;
       if (ctx.type === "delete") {
-        discoveryChanged = removeDiscoveredFile(file);
+        discoveryChanged = discoveryRuntime.removeDiscoveredFile(file);
       } else {
         let code: string;
         try {
@@ -288,7 +169,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           return;
         }
 
-        discoveryChanged = processUpdate(file, code);
+        discoveryChanged = discoveryRuntime.processUpdate(file, code);
       }
 
       if (!discoveryChanged) {
@@ -298,15 +179,13 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       // The discovered service graph changed. Regenerate the container by
       // invalidating it in every environment, then force a full reload so the
       // browser re-fetches the new wiring. The DI graph cannot be hot-swapped.
-      invalidateContainerModule(ctx.server);
+      invalidateContainerModule(ctx.server, resolvedVirtualModuleId);
       this.environment.hot.send({ type: "full-reload" });
       return [];
     },
 
     buildStart() {
-      discovery.clear();
-      discoveredClasses.clear();
-      lazyReferencedClassKeys.clear();
+      discoveryRuntime.clear();
       for (const ref of providerModuleRefs) {
         this.addWatchFile(ref.absPath);
       }
@@ -318,7 +197,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         if (/\.(tsx?|ts)$/i.test(file) && !file.endsWith(".d.ts")) {
           try {
             const code = fs.readFileSync(file, "utf-8");
-            processUpdate(file, code);
+            discoveryRuntime.processUpdate(file, code);
           } catch {
             // Ignore read errors
           }
@@ -333,7 +212,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         if (id !== resolvedVirtualModuleId) {
           return undefined;
         }
-        const metas = Array.from(discoveredClasses.values());
+        const metas = Array.from(discoveryRuntime.discoveredClasses.values());
 
         // Attach identifier keys to local metas for deterministic output
         for (const meta of metas) {
@@ -408,7 +287,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
               svc,
               metasByName,
               resolver,
-              lazyReferencedClassKeys,
+              discoveryRuntime.lazyReferencedClassKeys,
             ),
           );
         }
@@ -421,14 +300,18 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         );
 
         const eagerReferencedNames = collectEagerReferencedNames(metas);
-        reconcileLazySet(metas, lazyReferencedClassKeys, eagerReferencedNames);
+        reconcileLazySet(
+          metas,
+          discoveryRuntime.lazyReferencedClassKeys,
+          eagerReferencedNames,
+        );
         augmentFactoryLazyServices(metas, lazyServiceKeys);
 
         // Rewrite relative imports is now handled by codegen.ts during reconstruction
 
         const code = generateContainerModule(
           metas,
-          new Set(lazyReferencedClassKeys),
+          new Set(discoveryRuntime.lazyReferencedClassKeys),
           providerImports,
         );
 
@@ -474,7 +357,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         if (resolvedVisualization) {
           const artifact = generateMermaidDiagram({
             metas,
-            lazyClassKeys: new Set(lazyReferencedClassKeys),
+            lazyClassKeys: new Set(discoveryRuntime.lazyReferencedClassKeys),
             options: resolvedVisualization.mermaidOptions,
           });
           ensureDirectoryForFile(resolvedVisualization.outputPath);
