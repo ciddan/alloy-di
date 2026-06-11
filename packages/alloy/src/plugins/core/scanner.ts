@@ -255,11 +255,11 @@ function resolveImportedDecorator(
       continue;
     }
     const cacheKey = `${candidate}:${requestedName}`;
-    if (resolutionCache.has(cacheKey)) {
-      const cached = resolutionCache.get(cacheKey);
-      if (cached) {
-        return cached;
-      }
+    const cached = resolutionCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    if (cached === null) {
       continue;
     }
     visitedModules.add(candidate);
@@ -337,29 +337,10 @@ function resolveDecoratorExport(
       if (element.name.text !== requestedName) {
         continue;
       }
-      const sourceName = element.propertyName?.text ?? element.name.text;
-
-      if (moduleSpecifier) {
-        const resolved = resolveImportedDecorator(
-          moduleSpecifier,
-          sourceName,
-          id,
-          visitedModules,
-          resolutionCache,
-        );
-        if (resolved) {
-          return resolved;
-        }
-        continue;
-      }
-
-      const importInfo = fileImports.get(sourceName);
-      if (!importInfo || importInfo.isTypeOnly) {
-        continue;
-      }
-      const resolved = resolveImportedDecorator(
-        importInfo.path,
-        importInfo.originalName ?? sourceName,
+      const resolved = resolveNamedExportElement(
+        element,
+        moduleSpecifier,
+        fileImports,
         id,
         visitedModules,
         resolutionCache,
@@ -371,6 +352,39 @@ function resolveDecoratorExport(
   }
 
   return undefined;
+}
+
+function resolveNamedExportElement(
+  element: ts.ExportSpecifier,
+  moduleSpecifier: string | undefined,
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
+): AlloyDecoratorName | undefined {
+  const sourceName = element.propertyName?.text ?? element.name.text;
+
+  if (moduleSpecifier) {
+    return resolveImportedDecorator(
+      moduleSpecifier,
+      sourceName,
+      id,
+      visitedModules,
+      resolutionCache,
+    );
+  }
+
+  const importInfo = fileImports.get(sourceName);
+  if (!importInfo || importInfo.isTypeOnly) {
+    return undefined;
+  }
+  return resolveImportedDecorator(
+    importInfo.path,
+    importInfo.originalName ?? sourceName,
+    id,
+    visitedModules,
+    resolutionCache,
+  );
 }
 
 function isAlloyDecoratorName(name: string): name is AlloyDecoratorName {
