@@ -1,13 +1,15 @@
 {
   "name": "@alloy-di/example-app",
-  "private": true,
   "version": "0.0.2",
+  "private": true,
+  "license": "MIT",
+  "author": "Mikael Selander",
   "type": "module",
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "format": "prettier -u --write ./",
-    "format:check": "prettier -u --check ./",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "lint": "oxlint --fix --type-aware --config ./.oxlintrc.json .",
     "lint:check": "oxlint --type-aware --config ./.oxlintrc.json .",
     "preview": "vite preview",
@@ -27,7 +29,5 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "sass": "^1.100.0"
-  },
-  "author": "Mikael Selander",
-  "license": "MIT"
+  }
 }

@@ -6,8 +6,8 @@
     "dev": "vitepress dev",
     "build": "vitepress build",
     "preview": "vitepress preview",
-    "format": "prettier -u --write ./",
-    "format:check": "prettier -u --check ./",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "lint": "oxlint --fix --type-aware --config ./.oxlintrc.json .",
     "lint:check": "oxlint --type-aware --config ./.oxlintrc.json ."
   },
