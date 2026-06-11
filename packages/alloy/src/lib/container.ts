@@ -474,13 +474,13 @@ export class Container {
       };
     }
 
-    const scope = registryEntry?.scope ?? ServiceScope.TRANSIENT;
-    const depsFn = registryEntry?.dependencies ?? (() => [] as const);
+    const scope = registryEntry.scope ?? ServiceScope.TRANSIENT;
+    const depsFn = registryEntry.dependencies ?? (() => [] as const);
     const dependencies = depsFn();
     const metadata = {
       scope,
       dependencies,
-      factory: registryEntry?.factory as Lazy<Constructor> | undefined,
+      factory: registryEntry.factory as Lazy<Constructor> | undefined,
     } as const;
 
     this.metadataCache.set(target, metadata);

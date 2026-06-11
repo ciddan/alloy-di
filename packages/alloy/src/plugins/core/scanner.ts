@@ -251,15 +251,15 @@ function resolveImportedDecorator(
     fromId,
     importPath,
   )) {
-    if (visitedModules.has(candidate) || !fs.existsSync(candidate)) {
-      continue;
-    }
     const cacheKey = `${candidate}:${requestedName}`;
     const cached = resolutionCache.get(cacheKey);
     if (cached) {
       return cached;
     }
     if (cached === null) {
+      continue;
+    }
+    if (visitedModules.has(candidate) || !fs.existsSync(candidate)) {
       continue;
     }
     visitedModules.add(candidate);

@@ -82,6 +82,53 @@ describe("Vite Plugin Alloy - module generation", () => {
     );
   });
 
+  it("treats a service as lazy-only after its eager reference is removed", async () => {
+    const plugin = alloy();
+    const core = `
+      import { Injectable } from 'alloy-di/runtime';
+      @Injectable()
+      export class Core {}
+    `;
+    const lazyConsumer = `
+      import { Injectable, Lazy } from 'alloy-di/runtime';
+      @Injectable(() => [Lazy(() => import('./core').then(m => m.Core))])
+      export class LazyConsumer {}
+    `;
+    const eagerConsumer = `
+      import { Injectable } from 'alloy-di/runtime';
+      import { Core } from './core';
+      @Injectable(() => [Core])
+      export class EagerConsumer {}
+    `;
+    applyTransform(plugin, core, "/src/core.ts");
+    applyTransform(plugin, lazyConsumer, "/src/lazy-consumer.ts");
+    applyTransform(plugin, eagerConsumer, "/src/eager-consumer.ts");
+
+    // First generation: the eager reference keeps Core eagerly registered.
+    const first = (await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    )) as string;
+    expect(first).toMatch(/import \{ Core \} from '\/src\/core(\.ts)?';/);
+
+    // The eager reference is edited away, as a dev-server re-transform would.
+    const eagerConsumerEdited = `
+      import { Injectable } from 'alloy-di/runtime';
+      @Injectable()
+      export class EagerConsumer {}
+    `;
+    applyTransform(plugin, eagerConsumerEdited, "/src/eager-consumer.ts");
+
+    // Regeneration must see the surviving lazy reference and stop importing
+    // Core eagerly; the first generation must not have consumed its lazy key.
+    const second = (await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    )) as string;
+    expect(second).not.toMatch(/import \{ Core \} from '\/src\/core(\.ts)?';/);
+    expect(second).toMatch(/LazyConsumer/);
+  });
+
   it("omits services referenced only via Lazy", async () => {
     const plugin = alloy();
     const lazyService = `

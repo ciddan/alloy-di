@@ -38,7 +38,11 @@ export interface LoadVirtualContainerOptions {
 export async function loadVirtualContainerModule(
   options: LoadVirtualContainerOptions,
 ): Promise<{ code: string; moduleType: "js" }> {
-  const metas = options.localMetas;
+  const metas = options.localMetas.map((meta) => ({
+    ...meta,
+    metadata: { ...meta.metadata },
+  }));
+  const lazyClassKeys = new Set(options.lazyReferencedClassKeys);
 
   assignIdentifierKeys(metas, options.packageName, options.resolvedRoot);
 
@@ -60,14 +64,7 @@ export async function loadVirtualContainerModule(
   const metasByName = groupMetasByName(combinedMetas);
 
   for (const svc of manifestServices) {
-    metas.push(
-      toMetaFromManifest(
-        svc,
-        metasByName,
-        resolver,
-        options.lazyReferencedClassKeys,
-      ),
-    );
+    metas.push(toMetaFromManifest(svc, metasByName, resolver, lazyClassKeys));
   }
 
   const providerImports = Array.from(
@@ -75,18 +72,10 @@ export async function loadVirtualContainerModule(
   );
 
   const eagerReferencedNames = collectEagerReferencedNames(metas);
-  reconcileLazySet(
-    metas,
-    options.lazyReferencedClassKeys,
-    eagerReferencedNames,
-  );
+  reconcileLazySet(metas, lazyClassKeys, eagerReferencedNames);
   augmentFactoryLazyServices(metas, options.lazyServiceKeys);
 
-  const code = generateContainerModule(
-    metas,
-    new Set(options.lazyReferencedClassKeys),
-    providerImports,
-  );
+  const code = generateContainerModule(metas, lazyClassKeys, providerImports);
 
   writeTypeDefinitions(
     metas,
@@ -97,7 +86,7 @@ export async function loadVirtualContainerModule(
 
   writeVisualizationArtifact(
     metas,
-    options.lazyReferencedClassKeys,
+    lazyClassKeys,
     options.resolvedVisualization,
   );
 
