@@ -190,9 +190,18 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       },
     },
 
-    handleHotUpdate(ctx) {
+    hotUpdate(ctx) {
+      // Discovery is shared across environments; purge once (from the client
+      // environment) and only when the file is absent from every module graph,
+      // matching the combined view the legacy handleHotUpdate hook provided.
+      if (this.environment.name !== "client") {
+        return;
+      }
       const file = ctx.file;
-      if (!ctx.modules.length) {
+      const inAnyGraph = Object.values(ctx.server.environments).some(
+        (env) => env.moduleGraph.getModulesByFile(file)?.size,
+      );
+      if (ctx.type === "delete" || !inAnyGraph) {
         const removed = discovery.removeFile(file);
         if (removed.previousMetas) {
           for (const meta of removed.previousMetas) {
