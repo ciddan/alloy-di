@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { alloy } from "./index";
+import { applyTransform, loadContainer } from "./test-utils";
 import os from "node:os";
 import path from "path";
 
@@ -12,10 +13,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class ServiceA {}
     `;
     const id = "/src/service-a.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -29,10 +31,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class ServiceC {}
     `;
     const id = "/src/service-c.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -44,10 +47,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class ServiceD {}
     `;
     const id = "/src/service-d.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -63,12 +67,10 @@ describe("Vite Plugin Alloy - module generation", () => {
       @Injectable(() => [Core, Lazy(() => import('./core').then(m => m.Core))])
       export class Consumer {}
     `;
-    // @ts-expect-error testing transform
-    plugin.transform(eager, "/src/core.ts");
-    // @ts-expect-error testing transform
-    plugin.transform(mixed, "/src/consumer.ts");
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    applyTransform(plugin, eager, "/src/core.ts");
+    applyTransform(plugin, mixed, "/src/consumer.ts");
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     // Core should be imported & registered exactly once
@@ -92,12 +94,10 @@ describe("Vite Plugin Alloy - module generation", () => {
       @Injectable(() => [Lazy(() => import('./lazy-only').then(m => m.LazyOnly))])
       export class UsesLazy {}
     `;
-    // @ts-expect-error testing transform
-    plugin.transform(lazyService, "/src/lazy-only.ts");
-    // @ts-expect-error testing transform
-    plugin.transform(consumer, "/src/consumer.ts");
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    applyTransform(plugin, lazyService, "/src/lazy-only.ts");
+    applyTransform(plugin, consumer, "/src/consumer.ts");
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generatedCode).toContain("UsesLazy");
@@ -113,10 +113,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class SingletonService {}
     `;
     const id = "/src/singleton-service.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -128,17 +129,20 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class SingletonServiceDouble {}
     `;
     const id = "/src/singleton-service-double.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
   it("generates an empty module if no services are found", async () => {
     const plugin = alloy();
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -150,10 +154,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class WinPathService {}
     `;
     const id = "src\\nested\\win-path-service.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -166,10 +171,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export const View = () => null;
     `;
     const id = "/src/ui-component.tsx";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -181,10 +187,11 @@ describe("Vite Plugin Alloy - module generation", () => {
       export class ShSingleton {}
     `;
     const id = "/src/sh-singleton.ts";
-    // @ts-expect-error testing transform
-    plugin.transform(code, id);
-    // @ts-expect-error testing load
-    const generatedCode = await plugin.load("\0virtual:alloy-container");
+    applyTransform(plugin, code, id);
+    const generatedCode = await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    );
     expect(generatedCode).toMatchSnapshot();
   });
 
@@ -201,8 +208,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
 
@@ -244,8 +251,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generatedCode).toContain(
@@ -291,8 +298,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     // Expect imports for both Dep and Consumer using bare specifiers
@@ -349,8 +356,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     // Expect Lazy import with then and options
@@ -390,8 +397,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     expect(generatedCode).toContain(
@@ -433,8 +440,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
 
@@ -467,8 +474,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     // The container and registrations should be defined before provider invocation
@@ -510,8 +517,8 @@ describe("Vite Plugin Alloy - module generation", () => {
       void hook.handler.call({} as never, config);
     }
 
-    // @ts-expect-error testing load
-    const generatedCode = (await plugin.load(
+    const generatedCode = (await loadContainer(
+      plugin,
       "\0virtual:alloy-container",
     )) as string;
     // Token import line

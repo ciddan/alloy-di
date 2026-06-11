@@ -1,2 +1,4 @@
 /analytics
 /dist
+src/alloy-container.d.ts
+src/alloy-manifests.d.ts

@@ -5,6 +5,7 @@ import type { ResolvedConfig } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { alloy } from "./index";
+import { applyTransform, loadContainer } from "./test-utils";
 
 describe("Vite Plugin Alloy - visualize option", () => {
   let tmpRoot: string | undefined;
@@ -54,13 +55,10 @@ describe("Vite Plugin Alloy - visualize option", () => {
     const depId = path.join(tmpRoot, "src", "dep.ts");
     const mainId = path.join(tmpRoot, "src", "main.ts");
 
-    // @ts-expect-error transform signature for tests
-    plugin.transform(depCode, depId);
-    // @ts-expect-error transform signature for tests
-    plugin.transform(serviceCode, mainId);
+    applyTransform(plugin, depCode, depId);
+    applyTransform(plugin, serviceCode, mainId);
 
-    // @ts-expect-error load signature for tests
-    const generated = await plugin.load("\0virtual:alloy-container");
+    const generated = await loadContainer(plugin, "\0virtual:alloy-container");
     expect(typeof generated).toBe("string");
 
     expect(fs.existsSync(diagramPath)).toBe(true);
