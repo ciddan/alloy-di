@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import {
   generateContainerModule,
@@ -82,6 +82,50 @@ function toLazyServiceKey(identifier: ServiceIdentifier): string {
   return description;
 }
 
+/** Files the discovery scanner processes (mirrors the transform hook filter). */
+function isDiscoverableFile(file: string): boolean {
+  return (
+    /\.tsx?$/i.test(file) &&
+    !/\.d\.ts$/i.test(file) &&
+    !file.includes("node_modules")
+  );
+}
+
+/**
+ * Serializes the codegen-relevant fields of a file's discovered metas so two
+ * scans can be compared. Changes here (added/removed services, scope, deps,
+ * factory, or resolved imports) mean the generated container must be rebuilt;
+ * edits that leave them untouched (e.g. a method body) should not.
+ */
+function metasSignature(metas: readonly DiscoveredMeta[]): string {
+  return JSON.stringify(
+    metas.map((m) => ({
+      className: m.className,
+      filePath: m.filePath,
+      scope: m.metadata.scope,
+      factory: m.metadata.factory?.expression ?? null,
+      dependencies: m.metadata.dependencies.map((d) => ({
+        expression: d.expression,
+        isLazy: d.isLazy,
+        referencedIdentifiers: d.referencedIdentifiers,
+      })),
+      referencedImports: (m.referencedImports ?? []).map((r) => ({
+        name: r.name,
+        path: r.path,
+        originalName: r.originalName ?? null,
+        isTypeOnly: Boolean(r.isTypeOnly),
+      })),
+    })),
+  );
+}
+
+function lazyKeysSignature(keys: Set<string> | undefined): string {
+  if (!keys || keys.size === 0) {
+    return "";
+  }
+  return Array.from(keys).toSorted().join("|");
+}
+
 /**
  * Creates the Alloy Vite plugin that statically discovers injectable classes
  * and exposes them through a virtual container module at build time.
@@ -103,7 +147,11 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   const discoveredClasses = new Map<string, DiscoveredMeta>();
   const lazyReferencedClassKeys = new Set<string>();
 
-  const processUpdate = (id: string, code: string) => {
+  /**
+   * Re-scan a file and reconcile its contribution to the discovery registries.
+   * Returns whether the file's codegen-relevant discovery output changed.
+   */
+  const processUpdate = (id: string, code: string): boolean => {
     const { metas, lazyClassKeys, previousMetas, previousLazyClassKeys } =
       discovery.updateFile(id, code);
 
@@ -130,10 +178,53 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         lazyReferencedClassKeys.add(key);
       }
     }
+
+    return (
+      metasSignature(previousMetas ?? []) !== metasSignature(metas) ||
+      lazyKeysSignature(previousLazyClassKeys) !==
+        lazyKeysSignature(lazyClassKeys)
+    );
+  };
+
+  /**
+   * Drop a file's discovered metadata. Returns whether anything was removed
+   * (i.e. whether the generated container needs to be rebuilt).
+   */
+  const removeDiscoveredFile = (file: string): boolean => {
+    const removed = discovery.removeFile(file);
+    if (removed.previousMetas) {
+      for (const meta of removed.previousMetas) {
+        discoveredClasses.delete(createClassKey(meta.filePath, meta.className));
+      }
+    }
+    if (removed.previousLazyClassKeys) {
+      for (const key of removed.previousLazyClassKeys) {
+        lazyReferencedClassKeys.delete(key);
+      }
+    }
+    return Boolean(
+      removed.previousMetas?.length || removed.previousLazyClassKeys?.size,
+    );
+  };
+
+  /**
+   * Invalidate the generated container module in every environment's module
+   * graph so its `load` hook re-runs and regenerates from current discovery.
+   */
+  const invalidateContainerModule = (server: ViteDevServer): void => {
+    for (const environment of Object.values(server.environments)) {
+      const mod = environment.moduleGraph.getModuleById(
+        resolvedVirtualModuleId,
+      );
+      if (mod) {
+        environment.moduleGraph.invalidateModule(mod);
+      }
+    }
   };
 
   return {
     name: "vite-plugin-alloy",
+    enforce: "pre",
 
     configResolved(config) {
       resolvedRoot = config.root ?? process.cwd();
@@ -190,33 +281,41 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       },
     },
 
-    hotUpdate(ctx) {
-      // Discovery is shared across environments; purge once (from the client
-      // environment) and only when the file is absent from every module graph,
-      // matching the combined view the legacy handleHotUpdate hook provided.
+    async hotUpdate(ctx) {
       if (this.environment.name !== "client") {
         return;
       }
-      const file = ctx.file;
-      const inAnyGraph = Object.values(ctx.server.environments).some(
-        (env) => env.moduleGraph.getModulesByFile(file)?.size,
-      );
-      if (ctx.type === "delete" || !inAnyGraph) {
-        const removed = discovery.removeFile(file);
-        if (removed.previousMetas) {
-          for (const meta of removed.previousMetas) {
-            discoveredClasses.delete(
-              createClassKey(meta.filePath, meta.className),
-            );
-          }
-        }
-        if (removed.previousLazyClassKeys) {
-          for (const key of removed.previousLazyClassKeys) {
-            lazyReferencedClassKeys.delete(key);
-          }
-        }
+
+      const { file } = ctx;
+
+      if (!isDiscoverableFile(file)) {
+        return;
       }
-      return ctx.modules;
+
+      let discoveryChanged: boolean;
+      if (ctx.type === "delete") {
+        discoveryChanged = removeDiscoveredFile(file);
+      } else {
+        let code: string;
+        try {
+          code = await ctx.read();
+        } catch {
+          return;
+        }
+
+        discoveryChanged = processUpdate(file, code);
+      }
+
+      if (!discoveryChanged) {
+        return;
+      }
+
+      // The discovered service graph changed. Regenerate the container by
+      // invalidating it in every environment, then force a full reload so the
+      // browser re-fetches the new wiring. The DI graph cannot be hot-swapped.
+      invalidateContainerModule(ctx.server);
+      this.environment.hot.send({ type: "full-reload" });
+      return [];
     },
 
     buildStart() {

@@ -92,23 +92,71 @@ export async function loadContainer(
   return (result as { code: string }).code;
 }
 
+const RESOLVED_VIRTUAL_ID = "\0virtual:alloy-container";
+
 export interface HotUpdateContextInit {
   file: string;
-  modules?: unknown[];
+  /** Defaults to "update". */
   type?: "create" | "update" | "delete";
-  environments?: Record<string, unknown>;
+  /** Source returned by `ctx.read()` for create/update events. */
+  code?: string;
+  modules?: unknown[];
+  /** Whether the container module exists in the graph (default true). */
+  hasContainerModule?: boolean;
 }
 
-export function applyHotUpdate(
+export interface HotUpdateResult {
+  /** The hook's return value (`[]` when it forces a reload, else undefined). */
+  result: unknown;
+  /** Module ids passed to `invalidateModule`. */
+  invalidatedIds: string[];
+  /** Payloads sent via `environment.hot.send`. */
+  sent: unknown[];
+}
+
+/**
+ * Invokes the plugin's `hotUpdate` hook with a fake dev-server context: a
+ * single client environment whose module graph contains the resolved container
+ * module, plus spies for `invalidateModule` and `hot.send`.
+ */
+export async function applyHotUpdate(
   plugin: Plugin,
   init: HotUpdateContextInit,
-): unknown {
-  const hook = plugin.hotUpdate as unknown as AnyHook;
+): Promise<HotUpdateResult> {
+  const invalidatedIds: string[] = [];
+  const sent: unknown[] = [];
+  const hasContainer = init.hasContainerModule ?? true;
+  const containerModule = { id: RESOLVED_VIRTUAL_ID };
+
+  const environment = {
+    name: "client",
+    moduleGraph: {
+      getModuleById(id: string) {
+        return hasContainer && id === RESOLVED_VIRTUAL_ID
+          ? containerModule
+          : undefined;
+      },
+      invalidateModule(mod: { id: string }) {
+        invalidatedIds.push(mod.id);
+      },
+    },
+    hot: {
+      send(payload: unknown) {
+        sent.push(payload);
+      },
+    },
+  };
+
   const ctx = {
     file: init.file,
-    modules: init.modules ?? [],
     type: init.type ?? "update",
-    server: { environments: init.environments ?? {} },
+    timestamp: Date.now(),
+    modules: init.modules ?? [],
+    read: () => init.code ?? "",
+    server: { environments: { client: environment } },
   };
-  return getHandler(hook).call({ environment: { name: "client" } }, ctx);
+
+  const hook = plugin.hotUpdate as unknown as AnyHook;
+  const result = await getHandler(hook).call({ environment }, ctx);
+  return { result, invalidatedIds, sent };
 }
