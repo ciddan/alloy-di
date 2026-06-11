@@ -70,8 +70,10 @@ function createNamePool(reservedNames: Iterable<string>) {
   return {
     claim(base: string): string {
       let candidate = base;
-      for (let suffix = 1; used.has(candidate); suffix++) {
+      let suffix = 1;
+      while (used.has(candidate)) {
         candidate = `${base}_${suffix}`;
+        suffix++;
       }
       used.add(candidate);
       return candidate;
@@ -94,6 +96,65 @@ function createBindingKey(importPath: string, exportName: string): string {
   return `${stripModuleExtension(importPath)}::${exportName}`;
 }
 
+type ReferencedImport = NonNullable<
+  DiscoveredMeta["referencedImports"]
+>[number];
+
+/** Resolves a referenced import's specifier to a normalized module path. */
+function resolveReferencePath(
+  ref: ReferencedImport,
+  meta: DiscoveredMeta,
+): string {
+  return normalizeImportPath(
+    ref.path.startsWith(".")
+      ? path.resolve(path.dirname(meta.filePath), ref.path)
+      : ref.path,
+  );
+}
+
+function resolveDependencyImport(
+  ref: ReferencedImport,
+  normalizedPath: string,
+  pool: NamePool,
+  serviceBindings: Map<string, string>,
+  runtimeImports: Set<string>,
+): ResolvedDependencyImport {
+  // Reuse the runtime helper binding instead of re-importing it.
+  if (
+    normalizedPath === "alloy-di/runtime" &&
+    ref.originalName &&
+    ref.name === ref.originalName &&
+    runtimeImports.has(ref.originalName)
+  ) {
+    return {
+      localName: ref.originalName,
+      importPath: normalizedPath,
+      originalName: ref.originalName,
+      reusesExistingBinding: true,
+    };
+  }
+
+  // Reuse the service import (or factory-lazy stub) binding when the
+  // dependency resolves to a registered service.
+  const serviceLocalName = serviceBindings.get(
+    createBindingKey(normalizedPath, ref.originalName ?? "default"),
+  );
+  if (serviceLocalName) {
+    return {
+      localName: serviceLocalName,
+      importPath: normalizedPath,
+      originalName: ref.originalName,
+      reusesExistingBinding: true,
+    };
+  }
+
+  return {
+    localName: pool.claim(ref.name),
+    importPath: normalizedPath,
+    originalName: ref.originalName,
+  };
+}
+
 /**
  * Analyzes dependencies across all discovered services and resolves imports.
  * Deduplicates imports by binding identity, reuses bindings the module
@@ -112,60 +173,28 @@ function resolveDependencyImports(
   const importMap = new Map<string, ResolvedDependencyImport>();
 
   for (const meta of metas) {
-    if (!meta.referencedImports?.length) {
-      continue;
-    }
-    for (const ref of meta.referencedImports) {
+    for (const ref of meta.referencedImports ?? []) {
       if (ref.isTypeOnly) {
         continue;
       }
-      const normalizedPath = normalizeImportPath(
-        ref.path.startsWith(".")
-          ? path.resolve(path.dirname(meta.filePath), ref.path)
-          : ref.path,
+      const normalizedPath = resolveReferencePath(ref, meta);
+      const key = createBindingKey(
+        normalizedPath,
+        ref.originalName ?? "default",
       );
-      const exportName = ref.originalName ?? "default";
-      const key = `${normalizedPath}::${exportName}`;
       if (importMap.has(key)) {
         continue;
       }
-
-      // Reuse the runtime helper binding instead of re-importing it.
-      if (
-        normalizedPath === "alloy-di/runtime" &&
-        ref.originalName &&
-        ref.name === ref.originalName &&
-        runtimeImports.has(ref.originalName)
-      ) {
-        importMap.set(key, {
-          localName: ref.originalName,
-          importPath: normalizedPath,
-          originalName: ref.originalName,
-          reusesExistingBinding: true,
-        });
-        continue;
-      }
-
-      // Reuse the service import (or factory-lazy stub) binding when the
-      // dependency resolves to a registered service.
-      const serviceLocalName = serviceBindings.get(
-        createBindingKey(normalizedPath, exportName),
+      importMap.set(
+        key,
+        resolveDependencyImport(
+          ref,
+          normalizedPath,
+          pool,
+          serviceBindings,
+          runtimeImports,
+        ),
       );
-      if (serviceLocalName) {
-        importMap.set(key, {
-          localName: serviceLocalName,
-          importPath: normalizedPath,
-          originalName: ref.originalName,
-          reusesExistingBinding: true,
-        });
-        continue;
-      }
-
-      importMap.set(key, {
-        localName: pool.claim(ref.name),
-        importPath: normalizedPath,
-        originalName: ref.originalName,
-      });
     }
   }
 
@@ -236,12 +265,10 @@ function reconstructOptionsText(
             (r) => r.name === ident && !r.isTypeOnly,
           );
           if (ref) {
-            const dir = path.dirname(meta.filePath);
-            const absPath = ref.path.startsWith(".")
-              ? path.resolve(dir, ref.path)
-              : ref.path;
-            const normalizedPath = normalizeImportPath(absPath);
-            const key = `${normalizedPath}::${ref.originalName ?? "default"}`;
+            const key = createBindingKey(
+              resolveReferencePath(ref, meta),
+              ref.originalName ?? "default",
+            );
             const resolved = importMap.get(key);
             return resolved ? resolved.localName : ident;
           }
@@ -571,13 +598,19 @@ export function generateContainerTypeDefinition(
   pathResolver: (path: string) => string,
 ): string {
   const resolver = new IdentifierResolver(metas);
+  // The declaration module imports Container and ServiceIdentifier from the
+  // runtime, so service type imports claim their names from a pool seeded
+  // with those bindings (mirroring the generated module's name allocation).
+  const pool = createNamePool(["Container", "ServiceIdentifier", "container"]);
 
   // Resolve imports
   const imports: string[] = [];
   const interfaceMembers: string[] = [];
 
   for (const meta of metas) {
-    const importName = resolver.resolve(meta.className, meta.filePath);
+    const importName = pool.claim(
+      resolver.resolve(meta.className, meta.filePath),
+    );
     const importPath = pathResolver(meta.filePath);
 
     // If the class name matches the import name, we can use a simple import

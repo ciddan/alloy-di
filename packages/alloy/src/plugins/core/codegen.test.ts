@@ -152,6 +152,17 @@ describe("codegen helper internals", () => {
   });
 });
 
+const consumerMetadata = (token: string): ServiceMetadata => ({
+  scope: ServiceScope.TRANSIENT,
+  dependencies: [
+    {
+      expression: token,
+      referencedIdentifiers: [token],
+      isLazy: false,
+    },
+  ],
+});
+
 describe("codegen local name collisions (issue #17)", () => {
   it("renames a dependency import that collides with a factory-lazy stub", () => {
     const metas = [
@@ -268,6 +279,48 @@ describe("codegen local name collisions (issue #17)", () => {
       "import { Container as Container_1 } from '/src/container.ts';",
     );
     expect(code).toContain("{ ctor: Container_1,");
+  });
+
+  it("deduplicates dependency imports that differ only by extension", () => {
+    const metas = [
+      {
+        className: "ConsumerA",
+        filePath: "/src/consumer-a.ts",
+        metadata: consumerMetadata("Tok"),
+        referencedImports: [
+          { name: "Tok", path: "/src/tok.ts", originalName: "Tok" },
+        ],
+      },
+      {
+        className: "ConsumerB",
+        filePath: "/src/consumer-b.ts",
+        metadata: consumerMetadata("Tok"),
+        referencedImports: [
+          { name: "Tok", path: "/src/tok", originalName: "Tok" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    const tokImports = code.match(/import \{ Tok[^\n]*/g) ?? [];
+    expect(tokImports).toEqual(["import { Tok } from '/src/tok.ts';"]);
+    expect(code).not.toContain("Tok_1");
+  });
+
+  it("renames a service type import that collides with declaration imports", () => {
+    const code = generateContainerTypeDefinition(
+      [
+        {
+          className: "Container",
+          filePath: "/src/container.ts",
+          metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+        },
+      ],
+      (resolvedPath) => resolvedPath,
+    );
+    expect(code).toContain(
+      "import { Container as Container_1 } from '/src/container.ts';",
+    );
+    expect(code).toContain("Container: ServiceIdentifier<Container_1>;");
   });
 
   it("reuses the service binding for a dependency import of the same export", () => {
