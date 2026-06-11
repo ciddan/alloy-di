@@ -19,6 +19,9 @@ jobs:
         name: Install pnpm
         with:
           run_install: false
+          # standalone pnpm bundles its own runtime; pnpm 11 requires
+          # Node >=22.13 but this step runs before setup-node
+          standalone: true
 
       - name: Install Node.js
         uses: actions/setup-node@v4
