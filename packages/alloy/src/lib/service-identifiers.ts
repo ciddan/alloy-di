@@ -26,8 +26,11 @@ function createServiceIdentifier(ctor: Constructor): ServiceIdentifier {
 /**
  * Associates a constructor with a stable identifier. When an explicit identifier
  * is provided (e.g., by generated metadata), it becomes canonical for the
- * constructor. Attempting to reuse an identifier with a different constructor
- * throws to surface manifest/config mismatches early.
+ * constructor when the constructor is first registered. If the constructor was
+ * already assigned an auto-generated identifier, later explicit identifiers are
+ * recorded as aliases so both symbols resolve to the same constructor.
+ * Attempting to reuse an identifier with a different constructor throws to
+ * surface manifest/config mismatches early.
  */
 export function registerServiceIdentifier<T>(
   ctor: Constructor,
@@ -42,6 +45,7 @@ export function registerServiceIdentifier<T>(
           "Attempted to reassign an existing ServiceIdentifier to a different constructor.",
         );
       }
+      identifierToCtor.set(explicitIdentifier, ctor);
     }
     // oxlint-disable-next-line no-unsafe-type-assertion
     return current as ServiceIdentifier<T>;

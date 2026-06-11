@@ -39,15 +39,18 @@ describe("service identifier registry", () => {
       expect(getConstructorByIdentifier(explicitIdentifier)).toBe(Explicit);
     });
 
-    it("ignores conflicting explicit identifiers for an already registered constructor", () => {
+    it("aliases an explicit identifier when the constructor was auto-registered first", () => {
       class Gamma {}
-      const canonical = registerServiceIdentifier(Gamma);
-      const conflicting = Symbol("GammaConflict") as ServiceIdentifier<Gamma>;
+      const autoIdentifier = registerServiceIdentifier(Gamma);
+      const explicitIdentifier = Symbol(
+        "GammaExplicit",
+      ) as ServiceIdentifier<Gamma>;
 
-      const result = registerServiceIdentifier(Gamma, conflicting);
+      const result = registerServiceIdentifier(Gamma, explicitIdentifier);
 
-      expect(result).toBe(canonical);
-      expect(getConstructorByIdentifier(conflicting)).toBeUndefined();
+      expect(result).toBe(autoIdentifier);
+      expect(getConstructorByIdentifier(autoIdentifier)).toBe(Gamma);
+      expect(getConstructorByIdentifier(explicitIdentifier)).toBe(Gamma);
     });
 
     it("throws when an explicit identifier is already bound to a different constructor", () => {
