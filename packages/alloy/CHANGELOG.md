@@ -1,5 +1,25 @@
 # alloy-di
 
+## 1.2.1
+
+### Patch Changes
+
+- ba5198e: Fix the generated container going stale during development. The plugin now
+  regenerates `virtual:alloy-container` on HMR: editing a service's scope,
+  dependencies, or factory, adding a new decorated file, or deleting one
+  invalidates the container module and triggers a reload, instead of serving
+  the version captured when the dev server started. Edits that don't affect the
+  DI graph (e.g. a method body) keep their normal HMR. The plugin also runs as
+  `enforce: "pre"` so discovery always scans the original TypeScript source.
+- d0b79bd: Fix library manifest generation so constructor dependencies preserve their
+  declared order when manifests are consumed. Interleaved eager, token, and lazy
+  dependencies now round-trip correctly, and lazy dependencies are recorded per
+  service instead of being shared across every service declared in the same file.
+- c03cfaa: Fix duplicate service registration checks so Alloy compares stable service
+  identities instead of class names alone. Libraries and apps can now define
+  services with the same class name without triggering false duplicate errors,
+  while true identity collisions still fail the build.
+
 ## 1.2.0
 
 ### Minor Changes
