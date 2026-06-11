@@ -23,7 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "alloy-di": "workspace:*",
     "@alloy-di/example-library-external": "workspace:*",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sass": "^1.81.0"
