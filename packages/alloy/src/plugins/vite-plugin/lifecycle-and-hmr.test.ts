@@ -34,6 +34,12 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
     expect(secondGen).toMatchSnapshot();
   });
 
+  it("runs as a pre plugin so discovery sees pre-transform source", () => {
+    // Without `pre`, a re-transform on the HMR path would scan code whose
+    // decorators were already lowered by another plugin and drop services.
+    expect(alloy().enforce).toBe("pre");
+  });
+
   it("resolveId returns resolved virtual id for virtual:alloy-container", () => {
     const plugin = alloy();
     const resolved = resolveVirtualId(plugin, "virtual:alloy-container");

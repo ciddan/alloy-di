@@ -134,6 +134,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
   return {
     name: "vite-plugin-alloy",
+    enforce: "pre",
 
     configResolved(config) {
       resolvedRoot = config.root ?? process.cwd();
