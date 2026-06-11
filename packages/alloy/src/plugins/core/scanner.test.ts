@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceScope } from "../../lib/scope";
 import { scanSource } from "./scanner";
 
@@ -311,5 +311,42 @@ describe("scanner decorator provenance", () => {
     );
 
     expect(metas).toHaveLength(0);
+  });
+
+  it("caches repeated local decorator lookups within a scan", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsPath = path.join(tmpDir, "decorators.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(
+      decoratorsPath,
+      'export { Injectable as Decorator } from "alloy-di/runtime";\n',
+    );
+
+    const readFileSyncSpy = vi.spyOn(fs, "readFileSync");
+
+    try {
+      const metas = runMetaScan(
+        `
+          import { Decorator } from "./decorators";
+
+          @Decorator()
+          export class First {}
+
+          @Decorator()
+          export class Second {}
+        `,
+        servicePath,
+      );
+
+      expect(metas).toHaveLength(2);
+      expect(
+        readFileSyncSpy.mock.calls.filter(
+          ([candidate]) => candidate === decoratorsPath,
+        ),
+      ).toHaveLength(1);
+    } finally {
+      readFileSyncSpy.mockRestore();
+    }
   });
 });

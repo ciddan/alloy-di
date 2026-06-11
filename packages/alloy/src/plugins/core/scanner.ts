@@ -23,6 +23,8 @@ interface ServiceDecoratorMatch {
   decoratorName: AlloyDecoratorName;
 }
 
+type DecoratorResolutionCache = Map<string, AlloyDecoratorName | null>;
+
 const ALLOY_RUNTIME_MODULE = "alloy-di/runtime";
 
 function collectFileImports(
@@ -86,6 +88,7 @@ export function scanSource(code: string, id: string): ScanResult {
   const discovered = new Map<string, DiscoveredMeta>();
   const lazyRefs = new Set<string>();
   const fileImports = collectFileImports(sourceFile);
+  const decoratorResolutionCache: DecoratorResolutionCache = new Map();
 
   const visit = (node: ts.Node) => {
     if (ts.isClassDeclaration(node)) {
@@ -94,6 +97,7 @@ export function scanSource(code: string, id: string): ScanResult {
         sourceFile,
         fileImports,
         discovered,
+        decoratorResolutionCache,
       });
     } else if (ts.isCallExpression(node)) {
       processLazyCall(node, id, sourceFile, lazyRefs);
@@ -110,6 +114,7 @@ interface ClassVisitContext {
   sourceFile: ts.SourceFile;
   fileImports: Map<string, ImportInfo>;
   discovered: Map<string, DiscoveredMeta>;
+  decoratorResolutionCache: DecoratorResolutionCache;
 }
 
 function handleClassDeclaration(
@@ -124,6 +129,7 @@ function handleClassDeclaration(
     context.sourceFile,
     context.fileImports,
     context.id,
+    context.decoratorResolutionCache,
   );
   if (!decoratorMatch) {
     return;
@@ -154,6 +160,7 @@ function findServiceDecorator(
   sourceFile: ts.SourceFile,
   fileImports: Map<string, ImportInfo>,
   id: string,
+  resolutionCache: DecoratorResolutionCache,
 ): ServiceDecoratorMatch | undefined {
   const decorators = ts.getDecorators ? ts.getDecorators(node) : undefined;
   if (!decorators?.length) {
@@ -168,6 +175,7 @@ function findServiceDecorator(
       fileImports,
       id,
       new Set([id]),
+      resolutionCache,
     );
     if (decoratorName) {
       return {
@@ -184,6 +192,7 @@ function resolveDecoratorName(
   fileImports: Map<string, ImportInfo>,
   id: string,
   visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
 ): AlloyDecoratorName | undefined {
   if (ts.isIdentifier(expression)) {
     const importInfo = fileImports.get(expression.text);
@@ -195,6 +204,7 @@ function resolveDecoratorName(
       importInfo.originalName ?? expression.text,
       id,
       visitedModules,
+      resolutionCache,
     );
   }
 
@@ -215,6 +225,7 @@ function resolveDecoratorName(
       expression.name.text,
       id,
       visitedModules,
+      resolutionCache,
     );
   }
 
@@ -226,6 +237,7 @@ function resolveImportedDecorator(
   requestedName: string,
   fromId: string,
   visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
 ): AlloyDecoratorName | undefined {
   if (importPath === ALLOY_RUNTIME_MODULE) {
     return isAlloyDecoratorName(requestedName) ? requestedName : undefined;
@@ -240,6 +252,14 @@ function resolveImportedDecorator(
     importPath,
   )) {
     if (visitedModules.has(candidate) || !fs.existsSync(candidate)) {
+      continue;
+    }
+    const cacheKey = `${candidate}:${requestedName}`;
+    if (resolutionCache.has(cacheKey)) {
+      const cached = resolutionCache.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
       continue;
     }
     visitedModules.add(candidate);
@@ -258,7 +278,9 @@ function resolveImportedDecorator(
         fileImports,
         candidate,
         visitedModules,
+        resolutionCache,
       );
+      resolutionCache.set(cacheKey, resolved ?? null);
       if (resolved) {
         return resolved;
       }
@@ -278,6 +300,7 @@ function resolveDecoratorExport(
   fileImports: Map<string, ImportInfo>,
   id: string,
   visitedModules: Set<string>,
+  resolutionCache: DecoratorResolutionCache,
 ): AlloyDecoratorName | undefined {
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement)) {
@@ -298,6 +321,7 @@ function resolveDecoratorExport(
         requestedName,
         id,
         visitedModules,
+        resolutionCache,
       );
       if (resolved) {
         return resolved;
@@ -321,6 +345,7 @@ function resolveDecoratorExport(
           sourceName,
           id,
           visitedModules,
+          resolutionCache,
         );
         if (resolved) {
           return resolved;
@@ -337,6 +362,7 @@ function resolveDecoratorExport(
         importInfo.originalName ?? sourceName,
         id,
         visitedModules,
+        resolutionCache,
       );
       if (resolved) {
         return resolved;
