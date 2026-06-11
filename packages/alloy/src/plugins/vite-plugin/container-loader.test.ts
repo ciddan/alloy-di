@@ -1,0 +1,111 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { loadVirtualContainerModule } from "./container-loader";
+import type { AlloyManifest, DiscoveredMeta } from "../core/types";
+
+function makeMetas(): DiscoveredMeta[] {
+  return [
+    {
+      className: "Core",
+      filePath: "/src/core.ts",
+      metadata: { scope: "singleton", dependencies: [] },
+    },
+    {
+      className: "Consumer",
+      filePath: "/src/consumer.ts",
+      metadata: {
+        scope: "singleton",
+        dependencies: [
+          {
+            expression: "Core",
+            referencedIdentifiers: ["Core"],
+            isLazy: false,
+          },
+        ],
+      },
+      referencedImports: [
+        { name: "Core", path: "/src/core.ts", originalName: "Core" },
+      ],
+    },
+  ];
+}
+
+/**
+ * The loader runs on every HMR-triggered container regeneration, so it must
+ * not mutate the discovery runtime's shared state: the cached metas (factory
+ * injection would poison the change-detection signature) and the live
+ * lazy-key set (manifest additions and eager-reference deletions would leak
+ * into later regenerations).
+ */
+describe("loadVirtualContainerModule input isolation", () => {
+  const manifestWithLazyDep: AlloyManifest = {
+    schemaVersion: 2,
+    packageName: "lib",
+    buildMode: "preserve-modules",
+    services: [
+      {
+        importPath: "lib/feature",
+        exportName: "Feature",
+        symbolKey: "alloy:lib/feature#Feature",
+        scope: "singleton",
+        deps: [
+          { kind: "lazy", exportName: "Widget", importPath: "lib/widget" },
+        ],
+      },
+    ],
+  };
+
+  it("does not mutate the caller's metas or lazy-key set", async () => {
+    const localMetas = makeMetas();
+    const coreMeta = localMetas[0];
+    // Core is referenced both lazily (key present) and eagerly (Consumer dep);
+    // reconciliation must happen on a copy, not on this set.
+    const lazyReferencedClassKeys = new Set(["/src/core.ts::Core"]);
+    // Matches the identifierKey the loader assigns for resolvedRoot "/".
+    const lazyServiceKeys = new Set(["alloy:test-pkg/src/core.ts#Core"]);
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+
+    await loadVirtualContainerModule({
+      localMetas,
+      lazyReferencedClassKeys,
+      manifests: [manifestWithLazyDep],
+      providerImportPaths: [],
+      lazyServiceKeys,
+      packageName: "test-pkg",
+      resolvedRoot: "/",
+      containerDeclarationDir: outDir,
+      resolvedVisualization: null,
+    });
+
+    // Manifest services are appended to a copy, not the caller's array.
+    expect(localMetas).toHaveLength(2);
+    // augmentFactoryLazyServices must not write into the cached meta.
+    expect(coreMeta.metadata.factory).toBeUndefined();
+    // assignIdentifierKeys must not write into the cached meta.
+    expect(coreMeta.identifierKey).toBeUndefined();
+    // No deletion from reconcileLazySet, no addition from the manifest lazy dep.
+    expect(lazyReferencedClassKeys).toEqual(new Set(["/src/core.ts::Core"]));
+  });
+
+  it("produces identical output when invoked twice with the same inputs", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const load = () =>
+      loadVirtualContainerModule({
+        localMetas: makeMetas(),
+        lazyReferencedClassKeys: new Set(["/src/core.ts::Core"]),
+        manifests: [manifestWithLazyDep],
+        providerImportPaths: [],
+        lazyServiceKeys: new Set<string>(),
+        packageName: "test-pkg",
+        resolvedRoot: "/",
+        containerDeclarationDir: outDir,
+        resolvedVisualization: null,
+      });
+
+    const first = await load();
+    const second = await load();
+    expect(second.code).toBe(first.code);
+  });
+});
