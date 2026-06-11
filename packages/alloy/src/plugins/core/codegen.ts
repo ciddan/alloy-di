@@ -51,24 +51,65 @@ export interface ResolvedDependencyImport {
   localName: string; // The name to use in the virtual module
   importPath: string; // The normalized absolute path to import from
   originalName?: string; // The export name (or default)
+  /**
+   * True when the local name refers to a binding that already exists in the
+   * generated module (a runtime helper, a service import, or a factory-lazy
+   * stub), so no import statement must be emitted for it.
+   */
+  reusesExistingBinding?: boolean;
+}
+
+/**
+ * Allocates module-local names from a single shared pool so the generated
+ * module's independent naming domains (runtime helpers, service imports,
+ * factory-lazy stubs, dependency imports, identifier consts, generated
+ * locals) can never collide.
+ */
+function createNamePool(reservedNames: Iterable<string>) {
+  const used = new Set(reservedNames);
+  return {
+    claim(base: string): string {
+      let candidate = base;
+      for (let suffix = 1; used.has(candidate); suffix++) {
+        candidate = `${base}_${suffix}`;
+      }
+      used.add(candidate);
+      return candidate;
+    },
+  };
+}
+
+type NamePool = ReturnType<typeof createNamePool>;
+
+function stripModuleExtension(importPath: string): string {
+  return importPath.replace(/\.[cm]?[jt]sx?$/i, "");
+}
+
+/**
+ * Identity of an imported binding: the module (extension-insensitive, since
+ * references may resolve extensionless while service paths keep theirs) plus
+ * the export name.
+ */
+function createBindingKey(importPath: string, exportName: string): string {
+  return `${stripModuleExtension(importPath)}::${exportName}`;
 }
 
 /**
  * Analyzes dependencies across all discovered services and resolves imports.
- * Deduplicates imports and handles naming collisions by generating unique local names.
+ * Deduplicates imports by binding identity, reuses bindings the module
+ * already declares (runtime helpers, service imports, factory-lazy stubs),
+ * and claims fresh local names from the shared pool otherwise.
  */
-function resolveDependencyImports(metas: DiscoveredMeta[]): {
+function resolveDependencyImports(
+  metas: DiscoveredMeta[],
+  pool: NamePool,
+  serviceBindings: Map<string, string>,
+  runtimeImports: Set<string>,
+): {
   dependencyImports: ResolvedDependencyImport[];
   importMap: Map<string, ResolvedDependencyImport>;
 } {
   const importMap = new Map<string, ResolvedDependencyImport>();
-  const nameCounts = new Map<string, number>();
-
-  const getUniqueName = (name: string) => {
-    const count = nameCounts.get(name) ?? 0;
-    nameCounts.set(name, count + 1);
-    return count === 0 ? name : `${name}_${count}`;
-  };
 
   for (const meta of metas) {
     if (!meta.referencedImports?.length) {
@@ -83,12 +124,45 @@ function resolveDependencyImports(metas: DiscoveredMeta[]): {
           ? path.resolve(path.dirname(meta.filePath), ref.path)
           : ref.path,
       );
-      const key = `${normalizedPath}::${ref.originalName ?? "default"}`;
+      const exportName = ref.originalName ?? "default";
+      const key = `${normalizedPath}::${exportName}`;
       if (importMap.has(key)) {
         continue;
       }
+
+      // Reuse the runtime helper binding instead of re-importing it.
+      if (
+        normalizedPath === "alloy-di/runtime" &&
+        ref.originalName &&
+        ref.name === ref.originalName &&
+        runtimeImports.has(ref.originalName)
+      ) {
+        importMap.set(key, {
+          localName: ref.originalName,
+          importPath: normalizedPath,
+          originalName: ref.originalName,
+          reusesExistingBinding: true,
+        });
+        continue;
+      }
+
+      // Reuse the service import (or factory-lazy stub) binding when the
+      // dependency resolves to a registered service.
+      const serviceLocalName = serviceBindings.get(
+        createBindingKey(normalizedPath, exportName),
+      );
+      if (serviceLocalName) {
+        importMap.set(key, {
+          localName: serviceLocalName,
+          importPath: normalizedPath,
+          originalName: ref.originalName,
+          reusesExistingBinding: true,
+        });
+        continue;
+      }
+
       importMap.set(key, {
-        localName: getUniqueName(ref.name),
+        localName: pool.claim(ref.name),
         importPath: normalizedPath,
         originalName: ref.originalName,
       });
@@ -135,6 +209,7 @@ function reconstructDependencyExpression(
 function reconstructOptionsText(
   meta: DiscoveredMeta,
   importMap: Map<string, ResolvedDependencyImport>,
+  serviceRenames: Map<string, string>,
 ): string {
   const { scope, dependencies, factory } = meta.metadata;
   const parts: string[] = [];
@@ -170,7 +245,9 @@ function reconstructOptionsText(
             const resolved = importMap.get(key);
             return resolved ? resolved.localName : ident;
           }
-          return ident;
+          // Identifiers without an import reference a service binding in the
+          // generated module; follow any pool-driven rename.
+          return serviceRenames.get(ident) ?? ident;
         },
         path.dirname(meta.filePath),
       );
@@ -187,32 +264,60 @@ function reconstructOptionsText(
 function buildImportsAndRegistrations(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
-  hasProviderModules: boolean,
+  providerModulePaths: string[],
 ): {
   runtimeImportStatement: string;
   registrationsBlock: string;
   stubsBlock: string;
   identifierExportBlock: string;
 } {
+  const hasProviderModules = providerModulePaths.length > 0;
   const activeMetas = filterActiveMetas(metas, lazyReferencedClassKeys);
-  const { dependencyImports, importMap } =
-    resolveDependencyImports(activeMetas);
   const resolver = new IdentifierResolver(activeMetas);
-  const resolvedRegistrations = enrichRegistrations(
+  const runtimeImports = computeRuntimeImports(activeMetas, hasProviderModules);
+
+  const pool = createNamePool([
+    ...runtimeImports,
+    "registrations",
+    "container",
+    "providerDefinitions",
+    ...providerModulePaths.map((_, idx) => `providers_${idx}`),
+  ]);
+
+  // Services claim their names first: dependency expressions may reference
+  // them by resolver name (same-file dependencies, manifest class deps), so
+  // their names take priority and colliding dependency imports get renamed.
+  const serviceNames = new Map<DiscoveredMeta, string>();
+  const serviceRenames = new Map<string, string>();
+  const serviceBindings = new Map<string, string>();
+  for (const meta of activeMetas) {
+    const baseName = resolver.resolve(meta.className, meta.filePath);
+    const name = pool.claim(baseName);
+    serviceNames.set(meta, name);
+    if (name !== baseName) {
+      serviceRenames.set(baseName, name);
+    }
+    serviceBindings.set(
+      createBindingKey(getServiceImportPath(meta), meta.className),
+      name,
+    );
+  }
+
+  const { dependencyImports, importMap } = resolveDependencyImports(
     activeMetas,
-    resolver,
-    importMap,
-  );
-  const runtimeImports = computeRuntimeImports(
-    resolvedRegistrations,
-    hasProviderModules,
-  );
-  const runtimeImportStatement = formatRuntimeImportStatement(runtimeImports);
-  const stubsBlock = createStubBlock(
-    dependencyImports,
-    resolvedRegistrations,
+    pool,
+    serviceBindings,
     runtimeImports,
   );
+  const resolvedRegistrations = enrichRegistrations(activeMetas, {
+    resolver,
+    serviceNames,
+    serviceRenames,
+    importMap,
+    pool,
+  });
+  const runtimeImportStatement = formatRuntimeImportStatement(runtimeImports);
+  const stubsBlock = createStubBlock(dependencyImports, resolvedRegistrations);
   const registrationEntries = buildRegistrationEntries(resolvedRegistrations);
   const registrationsBlock = createRegistrationsBlock(registrationEntries);
   const identifierExportBlock = createIdentifierExports(resolvedRegistrations);
@@ -237,18 +342,26 @@ function filterActiveMetas(
   );
 }
 
+interface RegistrationNaming {
+  resolver: IdentifierResolver;
+  serviceNames: Map<DiscoveredMeta, string>;
+  serviceRenames: Map<string, string>;
+  importMap: Map<string, ResolvedDependencyImport>;
+  pool: NamePool;
+}
+
 function enrichRegistrations(
   activeMetas: DiscoveredMeta[],
-  resolver: IdentifierResolver,
-  importMap: Map<string, ResolvedDependencyImport>,
+  naming: RegistrationNaming,
 ): ResolvedRegistration[] {
+  const { resolver, serviceNames, serviceRenames, importMap, pool } = naming;
   return activeMetas.map((meta) => {
-    const importName = resolver.resolve(meta.className, meta.filePath);
-    const identifierConst = `${importName}Identifier`;
+    const importName = serviceNames.get(meta) ?? meta.className;
+    const identifierConst = pool.claim(`${importName}Identifier`);
     const exportKey = createIdentifierExportKey(meta, resolver);
     const symbolDescription =
       meta.identifierKey ?? createSymbolDescription(meta);
-    const optionsText = reconstructOptionsText(meta, importMap);
+    const optionsText = reconstructOptionsText(meta, importMap, serviceRenames);
 
     return {
       ...meta,
@@ -263,11 +376,11 @@ function enrichRegistrations(
 }
 
 function computeRuntimeImports(
-  registrations: ResolvedRegistration[],
+  activeMetas: DiscoveredMeta[],
   hasProviderModules: boolean,
 ): Set<string> {
   const imports = new Set<string>(["Container", "dependenciesRegistry"]);
-  const needsLazyImport = registrations.some(
+  const needsLazyImport = activeMetas.some(
     (m) =>
       m.metadata.dependencies.some((d) => d.isLazy) || !!m.metadata.factory,
   );
@@ -277,7 +390,7 @@ function computeRuntimeImports(
   if (needsLazyImport) {
     imports.add("Lazy");
   }
-  if (registrations.length) {
+  if (activeMetas.length) {
     imports.add("registerServiceIdentifier");
   }
   return imports;
@@ -290,25 +403,16 @@ function formatRuntimeImportStatement(imports: Set<string>): string {
 function createStubBlock(
   dependencyImports: ResolvedDependencyImport[],
   registrations: ResolvedRegistration[],
-  runtimeImports: Set<string>,
 ): string {
   const statements: string[] = [];
-  const importedNames = new Set<string>(runtimeImports);
 
+  // Name uniqueness is guaranteed by the shared pool, so every entry that
+  // does not reuse an existing binding emits exactly one statement.
   for (const dep of dependencyImports) {
-    if (
-      dep.importPath === "alloy-di/runtime" &&
-      dep.originalName &&
-      dep.localName === dep.originalName &&
-      runtimeImports.has(dep.originalName)
-    ) {
-      continue;
-    }
-    if (importedNames.has(dep.localName)) {
+    if (dep.reusesExistingBinding) {
       continue;
     }
     statements.push(createDependencyImportStatement(dep));
-    importedNames.add(dep.localName);
   }
 
   for (const meta of registrations) {
@@ -316,11 +420,7 @@ function createStubBlock(
       statements.push(`class ${meta.importName} {}`);
       continue;
     }
-    if (importedNames.has(meta.importName)) {
-      continue;
-    }
     statements.push(createServiceImportStatement(meta));
-    importedNames.add(meta.importName);
   }
 
   return statements.length ? `${statements.join("\n")}\n` : "";
@@ -341,13 +441,15 @@ function createDependencyImportStatement(
   return `import { ${dep.localName} } from '${dep.importPath}';`;
 }
 
-function createServiceImportStatement(meta: ResolvedRegistration): string {
+function getServiceImportPath(meta: DiscoveredMeta): string {
   const isBareSpecifier =
     !/^(\/|[A-Za-z]:\\|\.|~)/.test(meta.filePath) &&
     !meta.filePath.includes("\\");
-  const importPath = isBareSpecifier
-    ? meta.filePath
-    : normalizeImportPath(meta.filePath);
+  return isBareSpecifier ? meta.filePath : normalizeImportPath(meta.filePath);
+}
+
+function createServiceImportStatement(meta: ResolvedRegistration): string {
+  const importPath = getServiceImportPath(meta);
   if (meta.importName === meta.className) {
     return `import { ${meta.className} } from '${importPath}';`;
   }
@@ -425,7 +527,7 @@ export function generateContainerModule(
   } = buildImportsAndRegistrations(
     metas,
     lazyReferencedClassKeys,
-    hasProviderModules,
+    providerModulePaths,
   );
 
   let providerImportBlock = "";
