@@ -467,6 +467,13 @@ export class Container {
     }
 
     const registryEntry = dependenciesRegistry.get(target as Newable<unknown>);
+    if (!registryEntry) {
+      return {
+        scope: ServiceScope.TRANSIENT,
+        dependencies: [],
+      };
+    }
+
     const scope = registryEntry?.scope ?? ServiceScope.TRANSIENT;
     const depsFn = registryEntry?.dependencies ?? (() => [] as const);
     const dependencies = depsFn();

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   generateContainerModule,
+  generateContainerTypeDefinition,
   generateManifestTypeDefinition,
   __codegenInternals,
   type ResolvedRegistration,
@@ -154,5 +155,37 @@ describe("codegen helper internals", () => {
     expect(block).toContain("{ ctor: Svc, meta: {} }");
     expect(block).toContain("{ ctor: Other, meta: { scope: 'singleton' } }");
     expect(createRegistrationsBlock([])).toBe("const registrations = [];");
+  });
+});
+
+describe("service identifier export key generation", () => {
+  it("keeps long same-prefix service identifier keys distinct", () => {
+    const firstPath =
+      "/src/really/long/shared/prefix/for/collision/0000/service.ts";
+    const secondPath =
+      "/src/really/long/shared/prefix/for/collision/0001/service.ts";
+
+    const code = generateContainerTypeDefinition(
+      [
+        {
+          className: "Foo",
+          filePath: firstPath,
+          metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+        },
+        {
+          className: "Foo",
+          filePath: secondPath,
+          metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+        },
+      ],
+      (resolvedPath) => resolvedPath,
+    );
+
+    const keyMatches = Array.from(
+      code.matchAll(/^\s*(Foo_[a-z0-9]+): ServiceIdentifier</gm),
+      (match) => match[1],
+    );
+
+    expect(Array.from(new Set(keyMatches))).toHaveLength(2);
   });
 });
