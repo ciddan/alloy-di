@@ -380,7 +380,9 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         );
       }
 
-      return code;
+      // The virtual module id has no file extension, so Rolldown (Vite 8+)
+      // cannot infer its module type and needs an explicit one.
+      return { code, moduleType: "js" };
     },
   };
 }
