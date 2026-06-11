@@ -30,7 +30,36 @@ export interface DiscoveredMeta {
   }[];
 }
 
-export interface ManifestServiceDescriptor {
+export interface ManifestTokenDependency {
+  exportName: string;
+  importPath: string;
+}
+
+export interface ManifestLazyDependency {
+  exportName: string;
+  importPath: string;
+  retry?: { retries: number; backoffMs?: number; factor?: number };
+}
+
+export interface ManifestClassDependencyEntry {
+  kind: "class";
+  exportName: string;
+}
+
+export interface ManifestTokenDependencyEntry extends ManifestTokenDependency {
+  kind: "token";
+}
+
+export interface ManifestLazyDependencyEntry extends ManifestLazyDependency {
+  kind: "lazy";
+}
+
+export type ManifestDependencyEntry =
+  | ManifestClassDependencyEntry
+  | ManifestTokenDependencyEntry
+  | ManifestLazyDependencyEntry;
+
+export interface ManifestServiceDescriptorBase {
   exportName: string;
   importPath: string;
   /**
@@ -39,18 +68,22 @@ export interface ManifestServiceDescriptor {
    */
   symbolKey: string;
   scope: ServiceScope;
+}
+
+export interface ManifestServiceDescriptorV1 extends ManifestServiceDescriptorBase {
   deps: string[];
   /** Token dependencies (non-service identifiers) exported publicly by the package. */
-  tokenDeps?: {
-    exportName: string;
-    importPath: string;
-  }[];
-  lazyDeps: {
-    exportName: string;
-    importPath: string;
-    retry?: { retries: number; backoffMs?: number; factor?: number };
-  }[];
+  tokenDeps?: ManifestTokenDependency[];
+  lazyDeps: ManifestLazyDependency[];
 }
+
+export interface ManifestServiceDescriptorV2 extends ManifestServiceDescriptorBase {
+  deps: ManifestDependencyEntry[];
+}
+
+export type ManifestServiceDescriptor =
+  | ManifestServiceDescriptorV1
+  | ManifestServiceDescriptorV2;
 
 export interface AlloyManifest {
   schemaVersion: number;

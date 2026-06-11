@@ -7,11 +7,7 @@ import {
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
 } from "../core/codegen";
-import type {
-  AlloyManifest,
-  DiscoveredMeta,
-  ManifestServiceDescriptor,
-} from "../core/types";
+import type { AlloyManifest, DiscoveredMeta } from "../core/types";
 import { createClassKey, normalizeImportPath, walkSync } from "../core/utils";
 import { createDiscoveryStore } from "../core/discovery-store";
 import { IdentifierResolver } from "../core/identifier-resolver";
@@ -408,7 +404,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
         const combinedMetas: DiscoveredMeta[] = [
           ...metas,
-          ...manifestServices.map((svc: ManifestServiceDescriptor) => ({
+          ...manifestServices.map((svc) => ({
             className: svc.exportName,
             filePath: svc.importPath,
             metadata: { scope: svc.scope, dependencies: [] },

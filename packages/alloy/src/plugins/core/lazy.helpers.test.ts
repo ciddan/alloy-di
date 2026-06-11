@@ -1,6 +1,10 @@
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { processLazyCall, __lazyInternals } from "./lazy";
+import {
+  parseLazyDependencyExpression,
+  processLazyCall,
+  __lazyInternals,
+} from "./lazy";
 
 const {
   getReturnedExpression,
@@ -113,6 +117,19 @@ describe("processLazyCall", () => {
       "Lazy(() => import('./services/foo').then());",
     );
     expect(refs.size).toBe(0);
+  });
+
+  it("parses retry options from lazy dependency expressions", () => {
+    const parsed = parseLazyDependencyExpression(
+      "Lazy(() => import('./services/foo').then((m) => m.Service), { retries: 2, backoffMs: 10, factor: 3 })",
+      "/src/entry.ts",
+    );
+    expect(parsed).toMatchObject({
+      specifier: "./services/foo",
+      exportName: "Service",
+      retry: { retries: 2, backoffMs: 10, factor: 3 },
+    });
+    expect(parsed?.classKeys).toContain("/src/services/foo.ts::Service");
   });
 });
 

@@ -1,6 +1,7 @@
 import { createClassKey } from "./utils";
 import path from "path";
 import ts from "typescript";
+import type { ManifestLazyDependency } from "./types";
 
 const RESOLVED_EXTENSIONS = [
   "",
@@ -18,22 +19,51 @@ export function processLazyCall(
   sourceFile: ts.SourceFile,
   localLazyRefs: Set<string>,
 ) {
-  if (node.expression.getText(sourceFile) !== "Lazy") {
+  if (!isLazyCall(node, sourceFile)) {
     return;
   }
-  const classKeys = resolveLazyTarget(node, fileId);
-  if (!classKeys) {
+  const parsed = resolveLazyDependency(node, fileId);
+  if (!parsed) {
     return;
   }
-  for (const key of classKeys) {
+  for (const key of parsed.classKeys) {
     localLazyRefs.add(key);
   }
 }
 
-function resolveLazyTarget(
+export interface ParsedLazyDependency extends ManifestLazyDependency {
+  specifier: string;
+  classKeys: string[];
+}
+
+export function parseLazyDependencyExpression(
+  expression: string,
+  fileId: string,
+): ParsedLazyDependency | undefined {
+  const sourceFile = ts.createSourceFile(
+    fileId,
+    `const __alloyLazy = (${expression});`,
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const statement = sourceFile.statements[0];
+  if (!statement || !ts.isVariableStatement(statement)) {
+    return undefined;
+  }
+  const declaration = statement.declarationList.declarations[0];
+  const initializer = declaration?.initializer;
+  const call = initializer ? unwrapExpression(initializer) : undefined;
+  if (!call || !ts.isCallExpression(call)) {
+    return undefined;
+  }
+  return resolveLazyDependency(call, fileId);
+}
+
+function resolveLazyDependency(
   node: ts.CallExpression,
   fileId: string,
-): string[] | undefined {
+): ParsedLazyDependency | undefined {
   const factory = getLazyFactory(node.arguments[0]);
   if (!factory) {
     return undefined;
@@ -47,6 +77,7 @@ function resolveLazyTarget(
   if (!importInfo || !exportName) {
     return undefined;
   }
+  const retry = extractRetryOptions(node.arguments[1]);
   const resolvedPaths = resolveModuleSpecifierCandidates(
     fileId,
     importInfo.specifier,
@@ -54,9 +85,15 @@ function resolveLazyTarget(
   if (!resolvedPaths.length) {
     return undefined;
   }
-  return resolvedPaths.map((candidate) =>
-    createClassKey(candidate, exportName),
-  );
+  return {
+    specifier: importInfo.specifier,
+    exportName,
+    retry,
+    importPath: importInfo.specifier,
+    classKeys: resolvedPaths.map((candidate) =>
+      createClassKey(candidate, exportName),
+    ),
+  };
 }
 
 function getLazyFactory(
@@ -69,6 +106,71 @@ function getLazyFactory(
     return arg;
   }
   return undefined;
+}
+
+function extractRetryOptions(
+  expr: ts.Expression | undefined,
+): ManifestLazyDependency["retry"] | undefined {
+  if (!expr || !ts.isObjectLiteralExpression(expr)) {
+    return undefined;
+  }
+
+  let retries: number | undefined;
+  let backoffMs: number | undefined;
+  let factor: number | undefined;
+
+  for (const prop of expr.properties) {
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) {
+      continue;
+    }
+    const value = extractNumberLiteral(prop.initializer);
+    if (typeof value !== "number") {
+      continue;
+    }
+    if (prop.name.text === "retries") {
+      retries = value;
+    } else if (prop.name.text === "backoffMs") {
+      backoffMs = value;
+    } else if (prop.name.text === "factor") {
+      factor = value;
+    }
+  }
+
+  if (typeof retries !== "number") {
+    return undefined;
+  }
+
+  return {
+    retries,
+    ...(typeof backoffMs === "number" ? { backoffMs } : {}),
+    ...(typeof factor === "number" ? { factor } : {}),
+  };
+}
+
+function extractNumberLiteral(expr: ts.Expression): number | undefined {
+  if (ts.isNumericLiteral(expr)) {
+    return Number(expr.text);
+  }
+  if (
+    ts.isPrefixUnaryExpression(expr) &&
+    expr.operator === ts.SyntaxKind.MinusToken &&
+    ts.isNumericLiteral(expr.operand)
+  ) {
+    return -Number(expr.operand.text);
+  }
+  return undefined;
+}
+
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  if (
+    ts.isParenthesizedExpression(expr) ||
+    ts.isAsExpression(expr) ||
+    ts.isTypeAssertionExpression(expr) ||
+    ts.isNonNullExpression(expr)
+  ) {
+    return unwrapExpression(expr.expression);
+  }
+  return expr;
 }
 
 function getReturnedExpression(
@@ -118,6 +220,14 @@ function isDynamicImport(node: ts.CallExpression): boolean {
   return node.expression.kind === ts.SyntaxKind.ImportKeyword;
 }
 
+function isLazyCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const text = node.expression.getText(sourceFile);
+  return text === "Lazy" || text.endsWith(".Lazy");
+}
+
 function getImportSpecifier(
   node: ts.Expression | undefined,
 ): string | undefined {
@@ -147,7 +257,7 @@ function extractExportNameFromExpression(
   return undefined;
 }
 
-function resolveModuleSpecifierCandidates(
+export function resolveModuleSpecifierCandidates(
   fromId: string,
   specifier: string,
 ): string[] {
@@ -167,7 +277,10 @@ function resolveModuleSpecifierCandidates(
 }
 
 export const __lazyInternals = {
-  resolveLazyTarget,
+  resolveLazyDependency,
+  extractRetryOptions,
+  extractNumberLiteral,
+  unwrapExpression,
   getReturnedExpression,
   extractImportInfo,
   getImportSpecifier,

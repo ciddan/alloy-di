@@ -540,7 +540,7 @@ export function generateManifestTypeDefinition(
 declare module "${m.packageName}/manifest" {
   type ServiceScope = "singleton" | "transient";
 
-  interface ManifestLazyDependency {
+  interface ManifestLegacyLazyDependency {
     exportName: string;
     importPath: string;
     retry?: {
@@ -550,21 +550,59 @@ declare module "${m.packageName}/manifest" {
     };
   }
 
-  interface ManifestTokenDependency {
+  interface ManifestLegacyTokenDependency {
     exportName: string;
     importPath: string;
     symbolKey?: string;
   }
 
-  interface ManifestService {
+  interface ManifestClassDependency {
+    kind: "class";
+    exportName: string;
+  }
+
+  interface ManifestTokenDependency {
+    kind: "token";
+    exportName: string;
+    importPath: string;
+    symbolKey?: string;
+  }
+
+  interface ManifestLazyDependency {
+    kind: "lazy";
+    exportName: string;
+    importPath: string;
+    retry?: {
+      retries: number;
+      backoffMs?: number;
+      factor?: number;
+    };
+  }
+
+  type ManifestDependency =
+    | ManifestClassDependency
+    | ManifestTokenDependency
+    | ManifestLazyDependency;
+
+  interface ManifestServiceV1 {
     exportName: string;
     importPath: string;
     symbolKey: string;
     scope: ServiceScope;
     deps: string[];
-    lazyDeps: ManifestLazyDependency[];
-    tokenDeps?: ManifestTokenDependency[];
+    lazyDeps: ManifestLegacyLazyDependency[];
+    tokenDeps?: ManifestLegacyTokenDependency[];
   }
+
+  interface ManifestServiceV2 {
+    exportName: string;
+    importPath: string;
+    symbolKey: string;
+    scope: ServiceScope;
+    deps: ManifestDependency[];
+  }
+
+  type ManifestService = ManifestServiceV1 | ManifestServiceV2;
 
   interface LibraryManifest {
     schemaVersion: number;
