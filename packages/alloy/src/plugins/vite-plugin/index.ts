@@ -2,26 +2,10 @@ import path from "node:path";
 import fs from "node:fs";
 import type { Plugin } from "vite";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
-import {
-  generateContainerModule,
-  generateContainerTypeDefinition,
-  generateManifestTypeDefinition,
-} from "../core/codegen";
-import type { AlloyManifest, DiscoveredMeta } from "../core/types";
+import type { AlloyManifest } from "../core/types";
 import { normalizeImportPath, walkSync } from "../core/utils";
-import { IdentifierResolver } from "../core/identifier-resolver";
+import { loadVirtualContainerModule } from "./container-loader";
 import {
-  readManifests,
-  groupMetasByName,
-  toMetaFromManifest,
-  collectEagerReferencedNames,
-  reconcileLazySet,
-  augmentFactoryLazyServices,
-  findDuplicateManifestServices,
-} from "./manifest-utils";
-import { generateMermaidDiagram } from "./visualizer";
-import {
-  ensureDirectoryForFile,
   resolveVisualizationOptions,
   type AlloyVisualizationOptions,
   type ResolvedVisualizationOptions,
@@ -80,12 +64,15 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   const resolvedVirtualModuleId = "\0" + virtualModuleId;
   const configuredProviderEntries = Array.from(options.providers ?? []);
   const providerModuleRefs: ProviderModuleRef[] = [];
+
   let resolvedRoot = process.cwd();
   let packageName = "UNKNOWN_PACKAGE";
   let resolvedVisualization: ResolvedVisualizationOptions | null = null;
+
   const lazyServiceKeys = new Set(
     (options.lazyServices ?? []).map(toLazyServiceKey),
   );
+
   const discoveryRuntime = createDiscoveryRuntime();
 
   return {
@@ -212,164 +199,18 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         if (id !== resolvedVirtualModuleId) {
           return undefined;
         }
-        const metas = Array.from(discoveryRuntime.discoveredClasses.values());
 
-        // Attach identifier keys to local metas for deterministic output
-        for (const meta of metas) {
-          const normalizedMetaPath = normalizeImportPath(meta.filePath);
-          const trimmedNormalizedMetaPath = normalizedMetaPath.replaceAll(
-            /^\/+/g,
-            "",
-          );
-          const looksRootRelative =
-            normalizedMetaPath === "/src" ||
-            normalizedMetaPath.startsWith("/src/");
-
-          let relPath = path.relative(resolvedRoot, meta.filePath);
-          if (path.sep === "\\") {
-            relPath = relPath.split(path.sep).join("/");
-          }
-
-          if (
-            looksRootRelative ||
-            !relPath ||
-            relPath.startsWith("..") ||
-            relPath.startsWith("\\")
-          ) {
-            relPath =
-              trimmedNormalizedMetaPath ||
-              normalizedMetaPath.replaceAll(/^\/+/g, "");
-          }
-
-          meta.identifierKey = `alloy:${packageName}/${relPath}#${meta.className}`;
-        }
-
-        const manifestData = await readManifests(options.manifests ?? []);
-        const manifestServices = manifestData.services;
-        const loadedManifests = manifestData.loadedManifests;
-
-        if (metas.length && manifestServices.length) {
-          const duplicates = findDuplicateManifestServices(
-            metas,
-            manifestServices,
-          );
-          if (duplicates.length) {
-            const details = duplicates
-              .map(
-                (d) =>
-                  `- ${d.exportName}: local [${d.localPaths.join(", ")}] vs manifest '${d.manifestImport}'`,
-              )
-              .join("\n");
-            throw new Error(
-              [
-                "[alloy] Duplicate service registrations detected.",
-                details,
-                "Resolve by removing one source (local or manifest) to avoid ambiguous DI keys.",
-              ].join("\n"),
-            );
-          }
-        }
-
-        const combinedMetas: DiscoveredMeta[] = [
-          ...metas,
-          ...manifestServices.map((svc) => ({
-            className: svc.exportName,
-            filePath: svc.importPath,
-            metadata: { scope: svc.scope, dependencies: [] },
-          })),
-        ];
-        const resolver = new IdentifierResolver(combinedMetas);
-        const metasByName = groupMetasByName(combinedMetas);
-
-        for (const svc of manifestServices) {
-          metas.push(
-            toMetaFromManifest(
-              svc,
-              metasByName,
-              resolver,
-              discoveryRuntime.lazyReferencedClassKeys,
-            ),
-          );
-        }
-
-        const providerImports = Array.from(
-          new Set([
-            ...providerModuleRefs.map((ref) => ref.importPath),
-            ...manifestData.providers,
-          ]),
-        );
-
-        const eagerReferencedNames = collectEagerReferencedNames(metas);
-        reconcileLazySet(
-          metas,
-          discoveryRuntime.lazyReferencedClassKeys,
-          eagerReferencedNames,
-        );
-        augmentFactoryLazyServices(metas, lazyServiceKeys);
-
-        // Rewrite relative imports is now handled by codegen.ts during reconstruction
-
-        const code = generateContainerModule(
-          metas,
-          new Set(discoveryRuntime.lazyReferencedClassKeys),
-          providerImports,
-        );
-
-        const dtsDir = path.resolve(
+        return loadVirtualContainerModule({
+          localMetas: Array.from(discoveryRuntime.discoveredClasses.values()),
+          lazyReferencedClassKeys: discoveryRuntime.lazyReferencedClassKeys,
+          manifests: options.manifests ?? [],
+          providerImportPaths: providerModuleRefs.map((ref) => ref.importPath),
+          lazyServiceKeys,
+          packageName,
           resolvedRoot,
-          options.containerDeclarationDir ?? "./src",
-        );
-
-        const dtsContent = generateContainerTypeDefinition(
-          metas,
-          (filePath) => {
-            if (path.isAbsolute(filePath)) {
-              let rel = path.relative(dtsDir, filePath);
-              rel = rel.split(path.sep).join(path.posix.sep);
-              if (!rel.startsWith(".")) {
-                rel = "./" + rel;
-              }
-              return rel;
-            }
-            return filePath;
-          },
-        );
-
-        if (!fs.existsSync(dtsDir)) {
-          fs.mkdirSync(dtsDir, { recursive: true });
-        }
-
-        const dtsPath = path.join(dtsDir, "alloy-container.d.ts");
-        fs.writeFileSync(dtsPath, dtsContent);
-
-        // Generate ambient declarations for consumed manifests
-        if (loadedManifests && loadedManifests.length > 0) {
-          const manifestsDts = generateManifestTypeDefinition(
-            loadedManifests.map((m) => ({
-              packageName: m.packageName,
-              services: m.services,
-            })),
-          );
-          const manifestsDtsPath = path.join(dtsDir, "alloy-manifests.d.ts");
-          fs.writeFileSync(manifestsDtsPath, manifestsDts);
-        }
-
-        if (resolvedVisualization) {
-          const artifact = generateMermaidDiagram({
-            metas,
-            lazyClassKeys: new Set(discoveryRuntime.lazyReferencedClassKeys),
-            options: resolvedVisualization.mermaidOptions,
-          });
-          ensureDirectoryForFile(resolvedVisualization.outputPath);
-          fs.writeFileSync(
-            resolvedVisualization.outputPath,
-            `${artifact.diagram}\n`,
-          );
-        }
-
-        // The virtual module id has no file extension, so Rolldown (Vite 8+)
-        // cannot infer its module type and needs an explicit one.
-        return { code, moduleType: "js" };
+          containerDeclarationDir: options.containerDeclarationDir,
+          resolvedVisualization,
+        });
       },
     },
   };
