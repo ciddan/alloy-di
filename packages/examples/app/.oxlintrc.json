@@ -2,9 +2,5 @@
   "extends": ["../../../.oxlintrc.json"],
   "rules": {
     "no-non-null-assertion": "off"
-  },
-  "typeCheck": {
-    "enable": true,
-    "tsConfigPath": "./tsconfig.json"
   }
 }

@@ -90,13 +90,13 @@ export async function readManifests(inputs: AlloyManifest[]): Promise<{
 
     loadedManifests.push({
       packageName: parsed.data.packageName,
-      // oxlint-disable-next-line: no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       services: parsed.data.services as ManifestServiceDescriptor[],
       providers: parsed.data.providers,
     });
 
     for (const svc of parsed.data.services) {
-      // oxlint-disable-next-line: no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       services.push(svc as ManifestServiceDescriptor);
     }
     for (const p of parsed.data.providers) {

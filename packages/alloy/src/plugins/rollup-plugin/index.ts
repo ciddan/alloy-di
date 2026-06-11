@@ -10,6 +10,12 @@ import type { ManifestServiceDescriptor } from "../core/types";
 import { createDiscoveryStore } from "../core/discovery-store";
 import { ServiceScope } from "../../lib/scope";
 
+/** Check if a node has the 'export' modifier */
+function hasExportModifier(node: ts.Node): boolean {
+  const mods = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return !!mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
 interface AlloyManifestV1 {
   schemaVersion: 1;
   packageName: string;
@@ -131,14 +137,6 @@ export function alloy(
       true,
     );
     const names = new Set<string>();
-
-    // Helper: check if a node has the 'export' modifier
-    const hasExportModifier = (node: ts.Node): boolean => {
-      const mods = ts.canHaveModifiers(node)
-        ? ts.getModifiers(node)
-        : undefined;
-      return !!mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-    };
 
     // Visit AST nodes to collect exported identifiers
     const visit = (node: ts.Node) => {

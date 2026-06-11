@@ -148,7 +148,7 @@ export class Container {
         `No provider registered for token ${token.description ?? String(token.id)}`,
       );
     }
-    // oxlint-disable-next-line: no-unsafe-type-assertion
+    // oxlint-disable-next-line no-unsafe-type-assertion
     return this.valueProviders.get(token.id) as T;
   }
 
@@ -197,7 +197,7 @@ export class Container {
     // Instance override fast path (test/mocking support)
     const overridden = this.instanceOverrides.get(target);
     if (overridden) {
-      // oxlint-disable-next-line: no-unsafe-type-assertion -- caller supplies correctly typed instance.
+      // oxlint-disable-next-line no-unsafe-type-assertion -- caller supplies correctly typed instance.
       return overridden as T;
     }
     // Guard: Detect circular dependencies
@@ -240,13 +240,13 @@ export class Container {
   ): Promise<T> {
     const cached = this.singletons.get(target);
     if (cached) {
-      // oxlint-disable-next-line: no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       return cached as T;
     }
 
     const pending = this.pendingSingletons.get(target);
     if (pending) {
-      // oxlint-disable-next-line: no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       return (await pending) as T;
     }
 
@@ -263,7 +263,7 @@ export class Container {
     this.pendingSingletons.set(target, creation);
 
     try {
-      // oxlint-disable-next-line: no-unsafe-type-assertion
+      // oxlint-disable-next-line no-unsafe-type-assertion
       return (await creation) as T;
     } finally {
       this.pendingSingletons.delete(target);
@@ -300,7 +300,7 @@ export class Container {
 
     // Construct the service with resolved dependencies
     const instance = new ctor(...paramInstances);
-    // oxlint-disable-next-line: no-unsafe-type-assertion -- ctor always resolves to the concrete service for target T before instantiation.
+    // oxlint-disable-next-line no-unsafe-type-assertion -- ctor always resolves to the concrete service for target T before instantiation.
     return instance as T;
   }
 
