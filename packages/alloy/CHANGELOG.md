@@ -1,5 +1,14 @@
 # alloy-di
 
+## 1.2.2
+
+### Patch Changes
+
+- e4f78b3: Fix service scanning so Alloy only recognizes `@Injectable` and `@Singleton`
+  decorators that resolve back to `alloy-di/runtime`. Aliased imports, namespace
+  imports, and local re-exports still work, while unrelated decorators with the
+  same names are ignored.
+
 ## 1.2.1
 
 ### Patch Changes
