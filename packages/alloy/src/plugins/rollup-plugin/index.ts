@@ -6,7 +6,17 @@ import {
   hasPreserveModules,
   resolveImportPathForBuild,
 } from "./build-utils";
-import type { ManifestServiceDescriptor } from "../core/types";
+import {
+  parseLazyDependencyExpression,
+  resolveModuleSpecifierCandidates,
+} from "../core/lazy";
+import type {
+  DependencyDescriptor,
+  DiscoveredMeta,
+  ManifestDependencyEntry,
+  ManifestServiceDescriptor,
+  ManifestServiceDescriptorV2,
+} from "../core/types";
 import { createDiscoveryStore } from "../core/discovery-store";
 import { ServiceScope } from "../../lib/scope";
 
@@ -16,11 +26,11 @@ function hasExportModifier(node: ts.Node): boolean {
   return !!mods?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 }
 
-interface AlloyManifestV1 {
-  schemaVersion: 1;
+interface AlloyManifestV2 {
+  schemaVersion: 2;
   packageName: string;
   buildMode: "preserve-modules" | "bundled" | "chunks";
-  services: ManifestServiceDescriptor[];
+  services: ManifestServiceDescriptorV2[];
   /** Optional provider module import specifiers (internal library-provided). */
   providers?: string[];
   diagnostics?: {
@@ -52,6 +62,77 @@ interface MinimalRollupPlugin {
   transform?(code: string, id: string): unknown;
   generateBundle?(outputOptions: unknown): void;
   emitFile?(file: { type: "asset"; fileName: string; source: string }): void;
+}
+
+function getDependencyImports(
+  meta: DiscoveredMeta,
+  dep: DependencyDescriptor,
+): NonNullable<DiscoveredMeta["referencedImports"]> {
+  const imports = meta.referencedImports ?? [];
+  if (imports.length === 0 || dep.referencedIdentifiers.length === 0) {
+    return [];
+  }
+  const identifiers = new Set(dep.referencedIdentifiers);
+  return imports.filter((entry) => identifiers.has(entry.name));
+}
+
+function getDependencyReferenceName(expression: string): string | undefined {
+  const sourceFile = ts.createSourceFile(
+    "dependency.ts",
+    `const __dep = (${expression});`,
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const statement = sourceFile.statements[0];
+  if (!statement || !ts.isVariableStatement(statement)) {
+    return undefined;
+  }
+  const initializer = statement.declarationList.declarations[0]?.initializer;
+  if (!initializer) {
+    return undefined;
+  }
+  return extractReferenceNameFromExpression(initializer);
+}
+
+function extractReferenceNameFromExpression(
+  expression: ts.Expression,
+): string | undefined {
+  if (ts.isIdentifier(expression)) {
+    return expression.text;
+  }
+  if (ts.isPropertyAccessExpression(expression)) {
+    return expression.name.text;
+  }
+  if (
+    ts.isAsExpression(expression) ||
+    ts.isParenthesizedExpression(expression) ||
+    ts.isNonNullExpression(expression) ||
+    ts.isTypeAssertionExpression(expression)
+  ) {
+    return extractReferenceNameFromExpression(expression.expression);
+  }
+  return undefined;
+}
+
+function resolveClassDependencyName(
+  dep: DependencyDescriptor,
+  meta: DiscoveredMeta,
+  knownServiceNames: Set<string>,
+): string | undefined {
+  const imports = getDependencyImports(meta, dep);
+  for (const entry of imports) {
+    if (entry.originalName && knownServiceNames.has(entry.originalName)) {
+      return entry.originalName;
+    }
+  }
+
+  const referenceName = getDependencyReferenceName(dep.expression);
+  if (referenceName && knownServiceNames.has(referenceName)) {
+    return referenceName;
+  }
+
+  return dep.referencedIdentifiers.find((name) => knownServiceNames.has(name));
 }
 
 export function alloy(
@@ -90,7 +171,7 @@ export function alloy(
    * @param outputOptions - Rollup/Rolldown output configuration
    * @returns Build mode identifier
    */
-  function getBuildMode(outputOptions: unknown): AlloyManifestV1["buildMode"] {
+  function getBuildMode(outputOptions: unknown): AlloyManifestV2["buildMode"] {
     const preserve = hasPreserveModules(outputOptions)
       ? Boolean(outputOptions.preserveModules)
       : false;
@@ -196,9 +277,94 @@ export function alloy(
    */
   function resolveImportPath(
     targetPath: string,
-    buildMode: AlloyManifestV1["buildMode"],
+    buildMode: AlloyManifestV2["buildMode"],
   ): string {
     return resolveImportPathForBuild(targetPath, packageName, buildMode);
+  }
+
+  function resolveDependencyImportPath(
+    specifier: string,
+    sourceFilePath: string,
+    buildMode: AlloyManifestV2["buildMode"],
+  ): string {
+    if (specifier.startsWith(".")) {
+      const resolvedCandidates = resolveModuleSpecifierCandidates(
+        sourceFilePath,
+        specifier,
+      );
+      const targetPath =
+        resolvedCandidates[0] ??
+        path.resolve(path.dirname(sourceFilePath), specifier);
+      return resolveImportPath(targetPath, buildMode);
+    }
+    if (path.isAbsolute(specifier)) {
+      return resolveImportPath(specifier, buildMode);
+    }
+    return specifier;
+  }
+
+  function createTokenDependency(
+    dep: DependencyDescriptor,
+    meta: DiscoveredMeta,
+    buildMode: AlloyManifestV2["buildMode"],
+  ): Extract<ManifestDependencyEntry, { kind: "token" }> {
+    const imports = getDependencyImports(meta, dep);
+    const preferredImport = imports.find((entry) => entry.originalName !== "*");
+    const exportName =
+      preferredImport?.originalName ??
+      getDependencyReferenceName(dep.expression) ??
+      dep.referencedIdentifiers[0] ??
+      dep.expression;
+    const importPath = preferredImport
+      ? resolveDependencyImportPath(
+          preferredImport.path,
+          meta.filePath,
+          buildMode,
+        )
+      : packageName;
+
+    return {
+      kind: "token",
+      exportName,
+      importPath,
+    };
+  }
+
+  function createManifestDependency(
+    dep: DependencyDescriptor,
+    meta: DiscoveredMeta,
+    knownServiceNames: Set<string>,
+    buildMode: AlloyManifestV2["buildMode"],
+  ): ManifestDependencyEntry | null {
+    if (dep.isLazy) {
+      const parsedLazy = parseLazyDependencyExpression(
+        dep.expression,
+        meta.filePath,
+      );
+      if (!parsedLazy) {
+        return null;
+      }
+      const entry: Extract<ManifestDependencyEntry, { kind: "lazy" }> = {
+        kind: "lazy",
+        exportName: parsedLazy.exportName,
+        importPath: resolveDependencyImportPath(
+          parsedLazy.specifier,
+          meta.filePath,
+          buildMode,
+        ),
+      };
+      if (parsedLazy.retry) {
+        entry.retry = parsedLazy.retry;
+      }
+      return entry;
+    }
+
+    const className = resolveClassDependencyName(dep, meta, knownServiceNames);
+    if (className) {
+      return { kind: "class", exportName: className };
+    }
+
+    return createTokenDependency(dep, meta, buildMode);
   }
 
   return {
@@ -217,7 +383,7 @@ export function alloy(
     generateBundle(outputOptions: unknown) {
       const buildMode = getBuildMode(outputOptions);
 
-      const services: ManifestServiceDescriptor[] = [];
+      const services: ManifestServiceDescriptorV2[] = [];
       const missingExports: string[] = [];
 
       // Export parsing (bundled/chunks modes): gather exported names from barrel if present.
@@ -245,7 +411,6 @@ export function alloy(
             symbolKey,
             scope,
             deps: [],
-            lazyDeps: [],
           });
           if (
             buildMode !== "preserve-modules" &&
@@ -256,16 +421,12 @@ export function alloy(
         }
       }
 
-      // Build a quick lookup for services by export name
-      const serviceByName = new Map<string, ManifestServiceDescriptor>();
-      for (const s of services) {
-        serviceByName.set(s.exportName, s);
+      const serviceByName = new Map<string, ManifestServiceDescriptorV2>();
+      const knownServiceNames = new Set<string>();
+      for (const service of services) {
+        serviceByName.set(service.exportName, service);
+        knownServiceNames.add(service.exportName);
       }
-
-      // --- Populate eager dependencies by parsing metadata ---
-      // Extracts identifiers from dependency descriptors.
-      // Track token dependencies (identifiers not matching a discovered service)
-      const serviceTokenDeps = new Map<string, Set<string>>();
 
       for (const metas of discovery.fileMetas.values()) {
         for (const meta of metas) {
@@ -274,71 +435,22 @@ export function alloy(
             continue;
           }
 
-          // Iterate through dependencies in the metadata
           for (const dep of meta.metadata.dependencies) {
-            // Skip Lazy dependencies (handled separately via fileLazyRefs)
-            if (dep.isLazy) {
-              continue;
-            }
-
-            // Use referenced identifiers
-            for (const name of dep.referencedIdentifiers) {
-              if (serviceByName.has(name)) {
-                svc.deps.push(name);
-              } else {
-                // Treat as potential token dependency; record for later emission.
-                const set =
-                  serviceTokenDeps.get(svc.exportName) ?? new Set<string>();
-                set.add(name);
-                serviceTokenDeps.set(svc.exportName, set);
-              }
+            const manifestDep = createManifestDependency(
+              dep,
+              meta,
+              knownServiceNames,
+              buildMode,
+            );
+            if (manifestDep) {
+              svc.deps.push(manifestDep);
             }
           }
         }
       }
 
-      // Populate lazyDeps from recorded lazy references, de-duplicated per service.
-      // We only add one descriptor per unique (exportName, importPath) pair.
-      // NOTE: refs contain multiple candidate paths for each Lazy import; we filter
-      // to only the first candidate per exportName in the originating file.
-      for (const [id, refs] of discovery.fileLazyRefs.entries()) {
-        const metas = discovery.fileMetas.get(id) ?? [];
-        for (const meta of metas) {
-          const svc = serviceByName.get(meta.className);
-          if (!svc) {
-            continue;
-          }
-          const firstForExport = new Map<string, string>();
-          for (const key of refs) {
-            const [targetPath, exportName] = key.split("::");
-            if (!targetPath || !exportName) {
-              continue;
-            }
-            const importPath = resolveImportPath(targetPath, buildMode);
-            if (!firstForExport.has(exportName)) {
-              firstForExport.set(exportName, importPath);
-            }
-          }
-          for (const [exportName, importPath] of firstForExport.entries()) {
-            svc.lazyDeps.push({ exportName, importPath });
-          }
-        }
-      }
-
-      // Emit tokenDeps for each service (public root import path assumption)
-      for (const [exportName, tokens] of serviceTokenDeps.entries()) {
-        const svc = serviceByName.get(exportName);
-        if (!svc || !tokens.size) {
-          continue;
-        }
-        svc.tokenDeps = Array.from(tokens).map((t) => ({
-          exportName: t,
-          importPath: packageName, // tokens exported from barrel/root
-        }));
-      }
-
-      const manifest: AlloyManifestV1 = {
-        schemaVersion: 1,
+      const manifest: AlloyManifestV2 = {
+        schemaVersion: 2,
         packageName,
         buildMode,
         services,
@@ -390,7 +502,7 @@ export function alloy(
         manifest.providers = resolvedProviders;
       }
 
-      const code = `// Generated Alloy manifest (v1)\nexport const manifest = ${JSON.stringify(manifest, null, 2)};\n`;
+      const code = `// Generated Alloy manifest (v2)\nexport const manifest = ${JSON.stringify(manifest, null, 2)};\n`;
 
       // Generate optional service-identifiers helper
       const identifiersCode = [

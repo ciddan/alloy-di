@@ -7,8 +7,10 @@ import {
 import type {
   AlloyManifest,
   DiscoveredMeta,
-  ManifestServiceDescriptor,
   DependencyDescriptor,
+  ManifestDependencyEntry,
+  ManifestServiceDescriptorV1,
+  ManifestServiceDescriptorV2,
   ServiceMetadata,
 } from "../core/types";
 import { IdentifierResolver } from "../core/identifier-resolver";
@@ -25,11 +27,26 @@ import { IdentifierResolver } from "../core/identifier-resolver";
  *  - Detect duplicate definitions across local discovery + ingested manifests
  */
 
-export interface LoadedManifest {
+export type LoadedManifestServiceDescriptor =
+  | (ManifestServiceDescriptorV1 & { schemaVersion: 1 })
+  | (ManifestServiceDescriptorV2 & { schemaVersion: 2 });
+
+export interface LoadedManifestBase {
   packageName: string;
-  services: ManifestServiceDescriptor[];
   providers: string[];
 }
+
+export interface LoadedManifestV1 extends LoadedManifestBase {
+  schemaVersion: 1;
+  services: Extract<LoadedManifestServiceDescriptor, { schemaVersion: 1 }>[];
+}
+
+export interface LoadedManifestV2 extends LoadedManifestBase {
+  schemaVersion: 2;
+  services: Extract<LoadedManifestServiceDescriptor, { schemaVersion: 2 }>[];
+}
+
+export type LoadedManifest = LoadedManifestV1 | LoadedManifestV2;
 
 /**
  * Reads a list of manifest objects and returns aggregated service + provider module specifiers.
@@ -37,73 +54,139 @@ export interface LoadedManifest {
  * @param inputs Direct manifest objects.
  * @returns Aggregated arrays of service descriptors and provider specifiers.
  */
+const retrySchema = z.object({
+  retries: z.number(),
+  backoffMs: z.number().optional(),
+  factor: z.number().optional(),
+});
+
+const manifestServiceSchemaV1 = z.object({
+  importPath: z.string(),
+  exportName: z.string(),
+  symbolKey: z.string(),
+  scope: z.enum(["singleton", "transient"]),
+  deps: z.array(z.string()).default([]),
+  tokenDeps: z
+    .array(z.object({ exportName: z.string(), importPath: z.string() }))
+    .default([]),
+  lazyDeps: z
+    .array(
+      z.object({
+        importPath: z.string(),
+        exportName: z.string(),
+        retry: retrySchema.optional(),
+      }),
+    )
+    .default([]),
+});
+
+const manifestServiceSchemaV2 = z.object({
+  importPath: z.string(),
+  exportName: z.string(),
+  symbolKey: z.string(),
+  scope: z.enum(["singleton", "transient"]),
+  deps: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("class"),
+          exportName: z.string(),
+        }),
+        z.object({
+          kind: z.literal("token"),
+          exportName: z.string(),
+          importPath: z.string(),
+        }),
+        z.object({
+          kind: z.literal("lazy"),
+          exportName: z.string(),
+          importPath: z.string(),
+          retry: retrySchema.optional(),
+        }),
+      ]),
+    )
+    .default([]),
+});
+
+const manifestSchemaV1 = z.object({
+  schemaVersion: z.number().optional(),
+  packageName: z.string(),
+  services: z.array(manifestServiceSchemaV1).default([]),
+  providers: z.array(z.string()).default([]),
+});
+
+const manifestSchemaV2 = z.object({
+  schemaVersion: z.literal(2),
+  packageName: z.string(),
+  services: z.array(manifestServiceSchemaV2).default([]),
+  providers: z.array(z.string()).default([]),
+});
+
 export async function readManifests(inputs: AlloyManifest[]): Promise<{
-  services: ManifestServiceDescriptor[];
+  services: LoadedManifestServiceDescriptor[];
   providers: string[];
   loadedManifests: LoadedManifest[];
 }> {
-  const services: ManifestServiceDescriptor[] = [];
+  const services: LoadedManifestServiceDescriptor[] = [];
   const providers: string[] = [];
   const loadedManifests: LoadedManifest[] = [];
 
-  const manifestSchema = z.object({
-    schemaVersion: z.number().optional(),
-    packageName: z.string(),
-    services: z
-      .array(
-        z.object({
-          importPath: z.string(),
-          exportName: z.string(),
-          symbolKey: z.string(),
-          scope: z.enum(["singleton", "transient"]),
-          deps: z.array(z.string()).default([]),
-          tokenDeps: z
-            .array(z.object({ exportName: z.string(), importPath: z.string() }))
-            .default([]),
-          lazyDeps: z
-            .array(
-              z.object({
-                importPath: z.string(),
-                exportName: z.string(),
-                retry: z
-                  .object({
-                    retries: z.number(),
-                    backoffMs: z.number().optional(),
-                    factor: z.number().optional(),
-                  })
-                  .optional(),
-              }),
-            )
-            .default([]),
-        }),
-      )
-      .default([]),
-    providers: z.array(z.string()).default([]),
-  });
-
   for (const manifest of inputs) {
-    const parsed = manifestSchema.safeParse(manifest);
-    if (!parsed.success) {
-      // Skip invalid manifests
+    const parsed = readManifestByVersion(manifest);
+    if (!parsed) {
       continue;
     }
 
-    loadedManifests.push({
-      packageName: parsed.data.packageName,
-      // oxlint-disable-next-line no-unsafe-type-assertion
-      services: parsed.data.services as ManifestServiceDescriptor[],
-      providers: parsed.data.providers,
-    });
-
-    for (const svc of parsed.data.services) {
-      // oxlint-disable-next-line no-unsafe-type-assertion
-      services.push(svc as ManifestServiceDescriptor);
+    loadedManifests.push(parsed);
+    for (const svc of parsed.services) {
+      services.push(svc);
     }
-    for (const p of parsed.data.providers) {
+    for (const p of parsed.providers) {
       providers.push(p);
     }
   }
   return Promise.resolve({ services, providers, loadedManifests });
+}
+
+function readManifestByVersion(manifest: AlloyManifest): LoadedManifest | null {
+  const schemaVersion = manifest.schemaVersion ?? 1;
+  return schemaVersion === 2
+    ? readManifestV2(manifest)
+    : readManifestV1(manifest);
+}
+
+function readManifestV1(manifest: AlloyManifest): LoadedManifestV1 | null {
+  const parsed = manifestSchemaV1.safeParse(manifest);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return {
+    schemaVersion: 1,
+    packageName: parsed.data.packageName,
+    services: parsed.data.services.map((svc) => ({
+      ...svc,
+      schemaVersion: 1 as const,
+    })),
+    providers: parsed.data.providers,
+  };
+}
+
+function readManifestV2(manifest: AlloyManifest): LoadedManifestV2 | null {
+  const parsed = manifestSchemaV2.safeParse(manifest);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return {
+    schemaVersion: 2,
+    packageName: parsed.data.packageName,
+    services: parsed.data.services.map((svc) => ({
+      ...svc,
+      schemaVersion: 2 as const,
+    })),
+    providers: parsed.data.providers,
+  };
 }
 
 /**
@@ -162,7 +245,7 @@ function selectMetaForDep(
  * @param lazySet Target set tracking lazy-only class keys
  */
 export function toMetaFromManifest(
-  svc: ManifestServiceDescriptor,
+  svc: LoadedManifestServiceDescriptor,
   metasByName: Map<string, DiscoveredMeta[]>,
   resolver: IdentifierResolver,
   lazySet: Set<string>,
@@ -174,30 +257,61 @@ export function toMetaFromManifest(
     originalName?: string;
   }[] = [];
 
+  if (svc.schemaVersion === 2) {
+    appendDependenciesFromManifestV2(
+      svc,
+      deps,
+      referencedImports,
+      metasByName,
+      resolver,
+      lazySet,
+    );
+  } else {
+    appendDependenciesFromManifestV1(
+      svc,
+      deps,
+      referencedImports,
+      metasByName,
+      resolver,
+      lazySet,
+    );
+  }
+
+  const metadata: ServiceMetadata = {
+    scope: svc.scope,
+    dependencies: deps,
+  };
+
+  return {
+    className: svc.exportName,
+    filePath: svc.importPath,
+    identifierKey: svc.symbolKey,
+    metadata,
+    referencedImports,
+  };
+}
+
+function appendDependenciesFromManifestV1(
+  svc: Extract<LoadedManifestServiceDescriptor, { schemaVersion: 1 }>,
+  deps: DependencyDescriptor[],
+  referencedImports: {
+    name: string;
+    path: string;
+    originalName?: string;
+  }[],
+  metasByName: Map<string, DiscoveredMeta[]>,
+  resolver: IdentifierResolver,
+  lazySet: Set<string>,
+): void {
   for (const depName of svc.deps ?? []) {
-    const targetMeta = selectMetaForDep(metasByName, depName, svc.importPath);
-    if (targetMeta) {
-      const expression = resolver.resolve(
-        targetMeta.className,
-        targetMeta.filePath,
-      );
-      deps.push({
-        expression,
-        referencedIdentifiers: [expression],
-        isLazy: false,
-      });
-    } else {
-      // Fallback: assume it's available globally or handled elsewhere?
-      // If it's not in metas, it might be a token or external.
-      // Manifests should list tokenDeps separately.
-      // If it's a class from another library not in manifests, we can't resolve it.
-      // We assume depName is sufficient.
-      deps.push({
-        expression: depName,
-        referencedIdentifiers: [depName],
-        isLazy: false,
-      });
-    }
+    deps.push(
+      createClassOrTokenDependency(
+        depName,
+        svc.importPath,
+        metasByName,
+        resolver,
+      ),
+    );
   }
 
   if (Array.isArray(svc.tokenDeps)) {
@@ -216,39 +330,128 @@ export function toMetaFromManifest(
   }
 
   for (const lazy of svc.lazyDeps ?? []) {
-    const importer = `() => import('${lazy.importPath}').then(m => m.${lazy.exportName})`;
-    let expr: string;
-    if (lazy.retry) {
-      const opts: string[] = [`retries: ${lazy.retry.retries}`];
-      if (typeof lazy.retry.backoffMs === "number") {
-        opts.push(`backoffMs: ${lazy.retry.backoffMs}`);
-      }
-      if (typeof lazy.retry.factor === "number") {
-        opts.push(`factor: ${lazy.retry.factor}`);
-      }
-      expr = `Lazy(${importer}, { ${opts.join(", ")} })`;
-    } else {
-      expr = `Lazy(${importer})`;
-    }
-    deps.push({
-      expression: expr,
-      referencedIdentifiers: [],
-      isLazy: true,
-    });
+    deps.push(createLazyDependencyDescriptor(lazy));
     lazySet.add(createClassKey(lazy.importPath, lazy.exportName));
   }
+}
 
-  const metadata: ServiceMetadata = {
-    scope: svc.scope,
-    dependencies: deps,
-  };
+function appendDependenciesFromManifestV2(
+  svc: Extract<LoadedManifestServiceDescriptor, { schemaVersion: 2 }>,
+  deps: DependencyDescriptor[],
+  referencedImports: {
+    name: string;
+    path: string;
+    originalName?: string;
+  }[],
+  metasByName: Map<string, DiscoveredMeta[]>,
+  resolver: IdentifierResolver,
+  lazySet: Set<string>,
+): void {
+  for (const dep of svc.deps) {
+    appendV2Dependency(
+      dep,
+      svc.importPath,
+      deps,
+      referencedImports,
+      metasByName,
+      resolver,
+      lazySet,
+    );
+  }
+}
+
+function appendV2Dependency(
+  dep: ManifestDependencyEntry,
+  currentImportPath: string,
+  deps: DependencyDescriptor[],
+  referencedImports: {
+    name: string;
+    path: string;
+    originalName?: string;
+  }[],
+  metasByName: Map<string, DiscoveredMeta[]>,
+  resolver: IdentifierResolver,
+  lazySet: Set<string>,
+): void {
+  if (dep.kind === "class") {
+    deps.push(
+      createClassOrTokenDependency(
+        dep.exportName,
+        currentImportPath,
+        metasByName,
+        resolver,
+      ),
+    );
+    return;
+  }
+
+  if (dep.kind === "token") {
+    deps.push({
+      expression: dep.exportName,
+      referencedIdentifiers: [dep.exportName],
+      isLazy: false,
+    });
+    referencedImports.push({
+      name: dep.exportName,
+      path: dep.importPath,
+      originalName: dep.exportName,
+    });
+    return;
+  }
+
+  deps.push(createLazyDependencyDescriptor(dep));
+  lazySet.add(createClassKey(dep.importPath, dep.exportName));
+}
+
+function createClassOrTokenDependency(
+  depName: string,
+  currentImportPath: string,
+  metasByName: Map<string, DiscoveredMeta[]>,
+  resolver: IdentifierResolver,
+): DependencyDescriptor {
+  const targetMeta = selectMetaForDep(metasByName, depName, currentImportPath);
+  if (targetMeta) {
+    const expression = resolver.resolve(
+      targetMeta.className,
+      targetMeta.filePath,
+    );
+    return {
+      expression,
+      referencedIdentifiers: [expression],
+      isLazy: false,
+    };
+  }
 
   return {
-    className: svc.exportName,
-    filePath: svc.importPath,
-    identifierKey: svc.symbolKey,
-    metadata,
-    referencedImports,
+    expression: depName,
+    referencedIdentifiers: [depName],
+    isLazy: false,
+  };
+}
+
+function createLazyDependencyDescriptor(
+  lazy: Pick<
+    Extract<ManifestDependencyEntry, { kind: "lazy" }>,
+    "exportName" | "importPath" | "retry"
+  >,
+): DependencyDescriptor {
+  const importer = `() => import('${lazy.importPath}').then(m => m.${lazy.exportName})`;
+  let expression = `Lazy(${importer})`;
+  if (lazy.retry) {
+    const opts: string[] = [`retries: ${lazy.retry.retries}`];
+    if (typeof lazy.retry.backoffMs === "number") {
+      opts.push(`backoffMs: ${lazy.retry.backoffMs}`);
+    }
+    if (typeof lazy.retry.factor === "number") {
+      opts.push(`factor: ${lazy.retry.factor}`);
+    }
+    expression = `Lazy(${importer}, { ${opts.join(", ")} })`;
+  }
+
+  return {
+    expression,
+    referencedIdentifiers: [],
+    isLazy: true,
   };
 }
 
@@ -334,7 +537,7 @@ export function augmentFactoryLazyServices(
  */
 export function findDuplicateManifestServices(
   localMetas: DiscoveredMeta[],
-  manifestServices: ManifestServiceDescriptor[],
+  manifestServices: LoadedManifestServiceDescriptor[],
 ): { exportName: string; localPaths: string[]; manifestImport: string }[] {
   const discoveredNames = new Set(localMetas.map((m) => m.className));
   const duplicates = manifestServices.filter((svc) =>

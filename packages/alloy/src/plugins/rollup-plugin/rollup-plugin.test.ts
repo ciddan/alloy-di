@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import { alloy } from "../../rollup";
+import type { AlloyManifest } from "../core/types";
 
 // Helper to simulate Rollup plugin lifecycle for the manifest plugin.
 function runPlugin(
@@ -25,6 +26,22 @@ function runPlugin(
     plugin.generateBundle.call(ctx, outputOptions);
   }
   return emitted;
+}
+
+function readManifest(
+  emitted: { fileName: string; source: string }[],
+): AlloyManifest {
+  const source = emitted.find((f) =>
+    f.fileName.endsWith(".manifest.mjs"),
+  )?.source;
+  if (!source) {
+    throw new Error("Manifest source not emitted");
+  }
+  const match = source.match(/export const manifest = ([\s\S]*);\n?$/);
+  if (!match?.[1]) {
+    throw new Error("Unable to parse manifest source");
+  }
+  return JSON.parse(match[1]) as AlloyManifest;
 }
 
 describe("manifest-plugin", () => {
@@ -142,7 +159,7 @@ describe("manifest-plugin", () => {
     }
   });
 
-  it("captures lazyDeps for a service with Lazy dependency", () => {
+  it("emits ordered lazy dependency entries in v2 manifests", () => {
     const files: Record<string, string> = {
       "/src/index.ts": `export { Reporter } from './reporting';`,
       "/src/analytics.ts": `@Injectable()\nexport class Analytics {}`,
@@ -153,12 +170,81 @@ describe("manifest-plugin", () => {
       files[k] = stubs + "\n" + files[k];
     }
     const emitted = runPlugin(files);
-    const src = emitted.find((f) =>
-      f.fileName.endsWith(".manifest.mjs"),
-    )?.source;
-    expect(src).toMatch(/"lazyDeps"/);
-    expect(src).toMatch(/Reporter/);
-    expect(src).toMatch(/Analytics/);
+    const manifest = readManifest(emitted);
+    const reporter = manifest.services.find(
+      (svc) => svc.exportName === "Reporter",
+    );
+    expect(manifest.schemaVersion).toBe(2);
+    expect(reporter).toMatchObject({
+      exportName: "Reporter",
+      deps: [{ kind: "lazy", exportName: "Analytics" }],
+    });
+  });
+
+  it("preserves dependency order across class, lazy, and token entries", () => {
+    const files: Record<string, string> = {
+      "/src/index.ts":
+        "export { Consumer } from './consumer'; export { DepA } from './dep-a'; export { DepB } from './dep-b'; export { ConfigToken } from './tokens';",
+      "/src/dep-a.ts": `@Injectable()\nexport class DepA {}`,
+      "/src/dep-b.ts": `@Injectable()\nexport class DepB {}`,
+      "/src/tokens.ts": `export const ConfigToken = Symbol('config');`,
+      "/src/consumer.ts": `
+        import { DepA } from './dep-a';
+        import { ConfigToken } from './tokens';
+        @Injectable(deps(DepA, Lazy(() => import('./dep-b').then(m => m.DepB)), ConfigToken))
+        export class Consumer {}
+      `,
+    };
+    const stubs = `function Injectable(){return (c:any)=>{}}\nfunction Lazy(x:any,y?:any){return x}\nfunction deps(...i:any[]){return ()=> i}`;
+    for (const k of Object.keys(files)) {
+      files[k] = stubs + "\n" + files[k];
+    }
+
+    const manifest = readManifest(runPlugin(files, { preserveModules: true }));
+    const consumer = manifest.services.find(
+      (svc) => svc.exportName === "Consumer",
+    );
+    expect(consumer?.deps).toEqual([
+      { kind: "class", exportName: "DepA" },
+      {
+        kind: "lazy",
+        exportName: "DepB",
+        importPath: "alloy-di/dep-b",
+      },
+      {
+        kind: "token",
+        exportName: "ConfigToken",
+        importPath: "alloy-di/tokens",
+      },
+    ]);
+  });
+
+  it("keeps lazy dependencies scoped to the declaring service", () => {
+    const files: Record<string, string> = {
+      "/src/index.ts": `export { First, Second } from './services'; export { DepA } from './dep-a'; export { DepB } from './dep-b';`,
+      "/src/dep-a.ts": `@Injectable()\nexport class DepA {}`,
+      "/src/dep-b.ts": `@Injectable()\nexport class DepB {}`,
+      "/src/services.ts": `
+        @Injectable(deps(Lazy(() => import('./dep-a').then(m => m.DepA))))
+        export class First {}
+        @Injectable(deps(Lazy(() => import('./dep-b').then(m => m.DepB))))
+        export class Second {}
+      `,
+    };
+    const stubs = `function Injectable(){return (c:any)=>{}}\nfunction Lazy(x:any,y?:any){return x}\nfunction deps(...i:any[]){return ()=> i}`;
+    for (const k of Object.keys(files)) {
+      files[k] = stubs + "\n" + files[k];
+    }
+
+    const manifest = readManifest(runPlugin(files, { preserveModules: true }));
+    const first = manifest.services.find((svc) => svc.exportName === "First");
+    const second = manifest.services.find((svc) => svc.exportName === "Second");
+    expect(first?.deps).toEqual([
+      { kind: "lazy", exportName: "DepA", importPath: "alloy-di/dep-a" },
+    ]);
+    expect(second?.deps).toEqual([
+      { kind: "lazy", exportName: "DepB", importPath: "alloy-di/dep-b" },
+    ]);
   });
 
   it("emits providers in preserve-modules mode", () => {

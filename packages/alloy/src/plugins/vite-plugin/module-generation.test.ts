@@ -368,6 +368,63 @@ describe("Vite Plugin Alloy - module generation", () => {
     expect(generatedCode).toContain("{ ctor: Consumer, meta: ");
   });
 
+  it("preserves ordered v2 manifest dependencies", async () => {
+    const manifest = {
+      schemaVersion: 2,
+      packageName: "@scope/lib",
+      buildMode: "bundled" as const,
+      services: [
+        {
+          exportName: "Dep",
+          importPath: "@scope/lib/dep",
+          symbolKey: "alloy:@scope/lib/dep#Dep",
+          scope: "transient" as const,
+          deps: [],
+        },
+        {
+          exportName: "Consumer",
+          importPath: "@scope/lib/consumer",
+          symbolKey: "alloy:@scope/lib/consumer#Consumer",
+          scope: "transient" as const,
+          deps: [
+            { kind: "class" as const, exportName: "Dep" },
+            {
+              kind: "lazy" as const,
+              exportName: "LazyTarget",
+              importPath: "@scope/lib/lazy-target",
+              retry: { retries: 1, factor: 3 },
+            },
+            {
+              kind: "token" as const,
+              exportName: "ConfigToken",
+              importPath: "@scope/lib/tokens",
+            },
+          ],
+        },
+      ],
+      providers: [],
+    };
+
+    const plugin = alloy({ manifests: [manifest] });
+    const hook = plugin.configResolved;
+    const config = {
+      root: os.tmpdir(),
+    } as unknown as import("vite").ResolvedConfig;
+    if (typeof hook === "function") {
+      void hook.call({} as never, config);
+    } else if (hook && typeof hook.handler === "function") {
+      void hook.handler.call({} as never, config);
+    }
+
+    const generatedCode = (await loadContainer(
+      plugin,
+      "\0virtual:alloy-container",
+    )) as string;
+    expect(generatedCode).toContain(
+      "dependencies: () => [Dep, Lazy(() => import('@scope/lib/lazy-target').then(m => m.LazyTarget), { retries: 1, factor: 3 }), ConfigToken]",
+    );
+  });
+
   it("imports provider modules declared in a manifest", async () => {
     const manifest = {
       schemaVersion: 1,
