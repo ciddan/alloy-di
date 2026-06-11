@@ -1,5 +1,12 @@
 # @alloy-di/example-library-internal
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [e4f78b3]
+  - alloy-di@1.2.2
+
 ## 0.0.5
 
 ### Patch Changes
