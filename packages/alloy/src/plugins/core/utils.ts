@@ -33,7 +33,7 @@ function ensureLeadingSlash(value: string): string {
 export function hashString(value: string): string {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
-    hash = Math.trunc(hash * 31 + value.charCodeAt(i));
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
   }
   return Math.abs(hash).toString(36);
 }

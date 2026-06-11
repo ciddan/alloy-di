@@ -35,4 +35,17 @@ describe("IdentifierResolver", () => {
       createAliasName("Foo", "/src/nested/foo.ts"),
     );
   });
+
+  it("keeps long same-prefix aliases distinct", () => {
+    const firstPath =
+      "/src/really/long/shared/prefix/for/collision/0000/service.ts";
+    const secondPath =
+      "/src/really/long/shared/prefix/for/collision/0001/service.ts";
+    const metas = [makeMeta("Foo", firstPath), makeMeta("Foo", secondPath)];
+    const resolver = new IdentifierResolver(metas);
+
+    expect(resolver.resolve("Foo", firstPath)).not.toBe(
+      resolver.resolve("Foo", secondPath),
+    );
+  });
 });
