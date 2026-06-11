@@ -117,6 +117,17 @@ describe("scanner decorator provenance", () => {
     expect(metas).toHaveLength(0);
   });
 
+  it("ignores non-service runtime decorators", () => {
+    const metas = runMetaScan(`
+      import { deps } from "alloy-di/runtime";
+
+      @deps()
+      export class Example {}
+    `);
+
+    expect(metas).toHaveLength(0);
+  });
+
   it("resolves Alloy decorators re-exported through a local module", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
     const decoratorsPath = path.join(tmpDir, "decorators.ts");
@@ -137,5 +148,168 @@ describe("scanner decorator provenance", () => {
     const metas = runMetaScan(serviceCode, servicePath);
     expect(metas).toHaveLength(1);
     expect(metas[0]?.className).toBe("Example");
+  });
+
+  it("resolves Alloy decorators through export-star barrels", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsPath = path.join(tmpDir, "decorators.ts");
+    const barrelPath = path.join(tmpDir, "barrel.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(
+      decoratorsPath,
+      'export { Singleton } from "alloy-di/runtime";\n',
+    );
+    fs.writeFileSync(barrelPath, 'export * from "./decorators";\n');
+
+    const metas = runMetaScan(
+      `
+        import { Singleton } from "./barrel";
+
+        @Singleton()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(1);
+    expect(metas[0]?.metadata.scope).toBe(ServiceScope.SINGLETON);
+  });
+
+  it("resolves Alloy decorators through local import-export indirection", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsPath = path.join(tmpDir, "decorators.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(
+      decoratorsPath,
+      [
+        'import { Injectable as BaseDecorator } from "alloy-di/runtime";',
+        "export { BaseDecorator as Decorator };",
+        "",
+      ].join("\n"),
+    );
+
+    const metas = runMetaScan(
+      `
+        import { Decorator } from "./decorators";
+
+        @Decorator()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(1);
+    expect(metas[0]?.className).toBe("Example");
+  });
+
+  it("ignores local re-exports backed by type-only imports", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsPath = path.join(tmpDir, "decorators.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(
+      decoratorsPath,
+      [
+        'import type { Injectable as BaseDecorator } from "alloy-di/runtime";',
+        "export { BaseDecorator as Decorator };",
+        "",
+      ].join("\n"),
+    );
+
+    const metas = runMetaScan(
+      `
+        import { Decorator } from "./decorators";
+
+        @Decorator()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(0);
+  });
+
+  it("ignores namespace export barrels that do not expose named decorators", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsPath = path.join(tmpDir, "decorators.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(
+      decoratorsPath,
+      'export * as AlloyDecorators from "alloy-di/runtime";\n',
+    );
+
+    const metas = runMetaScan(
+      `
+        import { Injectable } from "./decorators";
+
+        @Injectable()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(0);
+  });
+
+  it("ignores missing local decorator modules", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    const metas = runMetaScan(
+      `
+        import { Decorator } from "./decorators";
+
+        @Decorator()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(0);
+  });
+
+  it("stops resolving cyclic local re-exports", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const firstPath = path.join(tmpDir, "first.ts");
+    const secondPath = path.join(tmpDir, "second.ts");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.writeFileSync(firstPath, 'export { Decorator } from "./second";\n');
+    fs.writeFileSync(secondPath, 'export { Decorator } from "./first";\n');
+
+    const metas = runMetaScan(
+      `
+        import { Decorator } from "./first";
+
+        @Decorator()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(0);
+  });
+
+  it("ignores unreadable local decorator modules", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-scanner-"));
+    const decoratorsDir = path.join(tmpDir, "decorators");
+    const servicePath = path.join(tmpDir, "service.ts");
+
+    fs.mkdirSync(decoratorsDir);
+
+    const metas = runMetaScan(
+      `
+        import { Decorator } from "./decorators";
+
+        @Decorator()
+        export class Example {}
+      `,
+      servicePath,
+    );
+
+    expect(metas).toHaveLength(0);
   });
 });
