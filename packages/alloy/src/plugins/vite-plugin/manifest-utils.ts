@@ -539,15 +539,27 @@ export function findDuplicateManifestServices(
   localMetas: DiscoveredMeta[],
   manifestServices: LoadedManifestServiceDescriptor[],
 ): { exportName: string; localPaths: string[]; manifestImport: string }[] {
-  const discoveredNames = new Set(localMetas.map((m) => m.className));
-  const duplicates = manifestServices.filter((svc) =>
-    discoveredNames.has(svc.exportName),
-  );
-  return duplicates.map((d) => ({
-    exportName: d.exportName,
-    localPaths: localMetas
-      .filter((m) => m.className === d.exportName)
-      .map((m) => normalizeImportPath(m.filePath)),
-    manifestImport: d.importPath,
-  }));
+  const localMetasByIdentifier = new Map<string, DiscoveredMeta[]>();
+  for (const meta of localMetas) {
+    const identifierKey =
+      meta.identifierKey ?? createSymbolKey(meta.filePath, meta.className);
+    const matches = localMetasByIdentifier.get(identifierKey) ?? [];
+    matches.push(meta);
+    localMetasByIdentifier.set(identifierKey, matches);
+  }
+
+  return manifestServices.flatMap((svc) => {
+    const matches = localMetasByIdentifier.get(svc.symbolKey);
+    if (!matches?.length) {
+      return [];
+    }
+
+    return [
+      {
+        exportName: svc.exportName,
+        localPaths: matches.map((m) => normalizeImportPath(m.filePath)),
+        manifestImport: svc.importPath,
+      },
+    ];
+  });
 }
