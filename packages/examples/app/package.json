@@ -19,14 +19,14 @@
     "@alloy-di/example-library-internal": "workspace:*"
   },
   "devDependencies": {
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "alloy-di": "workspace:*",
     "@alloy-di/example-library-external": "workspace:*",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "sass": "^1.81.0"
+    "alloy-di": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sass": "^1.100.0"
   },
   "author": "Mikael Selander",
   "license": "MIT"
