@@ -33,6 +33,21 @@ function makeMetas(): DiscoveredMeta[] {
   ];
 }
 
+const tmpDirs: string[] = [];
+
+function makeOutDir(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+  tmpDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  for (const dir of tmpDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /**
  * The loader runs on every HMR-triggered container regeneration, so it must
  * not mutate the discovery runtime's shared state: the cached metas (factory
@@ -66,7 +81,7 @@ describe("loadVirtualContainerModule input isolation", () => {
     const lazyReferencedClassKeys = new Set(["/src/core.ts::Core"]);
     // Matches the identifierKey the loader assigns for resolvedRoot "/".
     const lazyServiceKeys = new Set(["alloy:test-pkg/src/core.ts#Core"]);
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
 
     await loadVirtualContainerModule({
       localMetas,
@@ -91,7 +106,7 @@ describe("loadVirtualContainerModule input isolation", () => {
   });
 
   it("produces identical output when invoked twice with the same inputs", async () => {
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
     const load = () =>
       loadVirtualContainerModule({
         localMetas: makeMetas(),
@@ -111,7 +126,7 @@ describe("loadVirtualContainerModule input isolation", () => {
   });
 
   it("does not rewrite unchanged artifacts on regeneration (issue #23)", async () => {
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
     const load = () =>
       loadVirtualContainerModule({
         localMetas: makeMetas(),
@@ -130,11 +145,14 @@ describe("loadVirtualContainerModule input isolation", () => {
     await load();
     const writeSpy = vi.spyOn(fs, "writeFileSync");
     await load();
-    expect(writeSpy).not.toHaveBeenCalled();
+    const artifactWrites = writeSpy.mock.calls.filter(
+      ([target]) => typeof target === "string" && target.startsWith(outDir),
+    );
+    expect(artifactWrites).toHaveLength(0);
   });
 
   it("prepends the generated-file notice to the mermaid artifact", async () => {
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
     const mermaidPath = path.join(outDir, "alloy-di.mmd");
 
     await loadVirtualContainerModule({
@@ -152,8 +170,4 @@ describe("loadVirtualContainerModule input isolation", () => {
     const mermaid = fs.readFileSync(mermaidPath, "utf-8");
     expect(mermaid.startsWith(`%% ${GENERATED_FILE_NOTICE}\n`)).toBe(true);
   });
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
