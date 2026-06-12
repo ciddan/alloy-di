@@ -78,7 +78,23 @@ function collectFileImports(
   return imports;
 }
 
+/**
+ * Cheap pre-filter that avoids the TS parse for files that cannot contribute
+ * discovery results: decorators require an `@` and lazy references require
+ * the `Lazy` identifier.
+ */
+function mayContainDiscoverableSyntax(code: string): boolean {
+  return code.includes("@") || code.includes("Lazy");
+}
+
+/** Exported for tests only. */
+export const __scannerInternals = { mayContainDiscoverableSyntax };
+
 export function scanSource(code: string, id: string): ScanResult {
+  if (!mayContainDiscoverableSyntax(code)) {
+    return { metas: [], lazyClassKeys: new Set() };
+  }
+
   const sourceFile = ts.createSourceFile(
     id,
     code,
