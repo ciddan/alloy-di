@@ -1,6 +1,6 @@
 {
   "name": "@alloy-di/example-library-internal",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Example internal library demonstrating direct Alloy decorator usage in monorepo packages",
   "keywords": [
