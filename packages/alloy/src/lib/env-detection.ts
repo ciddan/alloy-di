@@ -24,17 +24,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * Build-time-injected detection overrides.
+ *
+ * The Vite plugin emits a `setEnvDetectionOverrides({ isDev: ... })` call
+ * into the generated container module so detection in plugin-driven setups
+ * uses the bundler's authoritative mode instead of runtime sniffing.
+ */
+let injectedOverrides: EnvDetectionOverrides | undefined;
+
+export function setEnvDetectionOverrides(
+  overrides: EnvDetectionOverrides | undefined,
+): void {
+  injectedOverrides = overrides;
+}
+
 function readImportMetaEnvFromRuntime(): ImportMetaEnvShape | undefined {
   if (typeof import.meta === "undefined") {
     return undefined;
   }
 
-  const candidate: unknown = import.meta;
-  if (!isRecord(candidate) || !("env" in candidate)) {
-    return undefined;
-  }
-
-  const envValue = (candidate as { env?: unknown }).env;
+  // @ts-expect-error -- `env` is bundler-provided and not part of ImportMeta
+  const envValue: unknown = import.meta.env;
   if (!isRecord(envValue)) {
     return undefined;
   }
@@ -53,11 +64,12 @@ function readImportMetaEnvFromRuntime(): ImportMetaEnvShape | undefined {
 }
 
 function readProcessNodeEnv(): string | undefined {
-  if (typeof process === "undefined") {
+  try {
+    const nodeEnv: unknown = process.env?.NODE_ENV;
+    return typeof nodeEnv === "string" ? nodeEnv : undefined;
+  } catch {
     return undefined;
   }
-  const nodeEnv = process.env?.NODE_ENV;
-  return typeof nodeEnv === "string" ? nodeEnv : undefined;
 }
 
 export function getImportMetaEnv(
@@ -85,16 +97,17 @@ export function getNodeEnv(
 }
 
 export function isDevEnvironment(overrides?: EnvDetectionOverrides): boolean {
-  if (typeof overrides?.isDev === "boolean") {
-    return overrides.isDev;
+  const effective = overrides ?? injectedOverrides;
+  if (typeof effective?.isDev === "boolean") {
+    return effective.isDev;
   }
 
-  const nodeEnv = getNodeEnv(overrides);
+  const nodeEnv = getNodeEnv(effective);
   if (typeof nodeEnv === "string") {
     return nodeEnv !== "production";
   }
 
-  const importMetaEnv = getImportMetaEnv(overrides);
+  const importMetaEnv = getImportMetaEnv(effective);
   if (typeof importMetaEnv?.PROD === "boolean") {
     return !importMetaEnv.PROD;
   }

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   getImportMetaEnv,
   getNodeEnv,
   isDevEnvironment,
+  setEnvDetectionOverrides,
   type ImportMetaEnvShape,
 } from "./env-detection";
 
@@ -70,6 +71,32 @@ describe("env-detection", () => {
 
     it("defaults to development when no hints are available", () => {
       expect(isDevEnvironment()).toBe(true);
+    });
+  });
+
+  describe("setEnvDetectionOverrides (build-time injection)", () => {
+    afterEach(() => {
+      setEnvDetectionOverrides(undefined);
+    });
+
+    it("pins detection to the injected mode", () => {
+      setEnvDetectionOverrides({ isDev: false });
+      expect(isDevEnvironment()).toBe(false);
+
+      setEnvDetectionOverrides({ isDev: true });
+      expect(isDevEnvironment()).toBe(true);
+    });
+
+    it("explicit call-site overrides win over injected ones", () => {
+      setEnvDetectionOverrides({ isDev: false });
+      expect(isDevEnvironment({ isDev: true })).toBe(true);
+      expect(isDevEnvironment({ nodeEnv: "production" })).toBe(false);
+    });
+
+    it("clearing the injected overrides restores runtime sniffing", () => {
+      setEnvDetectionOverrides({ isDev: false });
+      setEnvDetectionOverrides(undefined);
+      expect(isDevEnvironment({ nodeEnv: "development" })).toBe(true);
     });
   });
 });

@@ -355,6 +355,45 @@ describe("codegen local name collisions (issue #17)", () => {
   });
 });
 
+describe("environment override injection", () => {
+  const meta = {
+    className: "Svc",
+    filePath: "/src/svc.ts",
+    metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+  };
+
+  it("emits a setEnvDetectionOverrides call when isDev is provided", () => {
+    const code = generateContainerModule([meta], new Set(), [], {
+      isDev: false,
+    });
+    expect(code).toContain("setEnvDetectionOverrides");
+    expect(code).toContain("setEnvDetectionOverrides({ isDev: false });");
+    expect(code).toMatch(
+      /import \{[^}]*setEnvDetectionOverrides[^}]*\} from 'alloy-di\/runtime';/,
+    );
+  });
+
+  it("emits no override call when the mode is unknown", () => {
+    const code = generateContainerModule([meta], new Set(), []);
+    expect(code).not.toContain("setEnvDetectionOverrides");
+  });
+
+  it("renames a service that collides with the injected helper", () => {
+    const colliding = {
+      className: "setEnvDetectionOverrides",
+      filePath: "/src/weird.ts",
+      metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+    };
+    const code = generateContainerModule([colliding], new Set(), [], {
+      isDev: true,
+    });
+    expect(code).toContain(
+      "import { setEnvDetectionOverrides as setEnvDetectionOverrides_1 } from '/src/weird.ts';",
+    );
+    expect(code).toContain("setEnvDetectionOverrides({ isDev: true });");
+  });
+});
+
 describe("dependency expression identifier rewriting (issue #25)", () => {
   it("rewrites $-prefixed identifiers that need a rename", () => {
     const metas = [
