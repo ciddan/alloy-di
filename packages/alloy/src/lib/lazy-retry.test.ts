@@ -70,6 +70,55 @@ describe("Lazy retry", () => {
     const ok = await container.get(UsesLazyOK);
     expect(ok.s.value).toBe(7);
   });
+
+  it("does not retry when the import succeeds but yields a non-constructor (issue #19)", async () => {
+    const container = new Container();
+
+    let attempts = 0;
+    @Injectable(
+      deps(
+        Lazy(
+          async () => {
+            attempts++;
+            return { default: 42 } as unknown as { default: typeof ToLoad };
+          },
+          { retries: 3, backoffMs: 1 },
+        ),
+      ),
+    )
+    class UsesNonConstructor {
+      constructor(public s: ToLoad) {}
+    }
+
+    await expect(container.get(UsesNonConstructor)).rejects.toThrow(
+      /Lazy importer did not return a class .* Received type: number/,
+    );
+    expect(attempts).toBe(1);
+  });
+
+  it("reports the validation failure directly, not wrapped as an import failure", async () => {
+    const container = new Container();
+
+    @Injectable(
+      deps(
+        Lazy(async () => undefined as unknown as { default: typeof ToLoad }, {
+          retries: 2,
+          backoffMs: 1,
+        }),
+      ),
+    )
+    class UsesUndefinedModule {
+      constructor(public s: ToLoad) {}
+    }
+
+    const failure = await container.get(UsesUndefinedModule).then(
+      () => undefined,
+      (err: unknown) => err as Error,
+    );
+    expect(failure).toBeDefined();
+    expect(failure?.message).toMatch(/Lazy importer did not return a class/);
+    expect(failure?.message).not.toMatch(/Failed to import lazy dependency/);
+  });
 });
 
 @Injectable(
