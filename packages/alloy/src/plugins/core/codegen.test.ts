@@ -119,7 +119,7 @@ describe("codegen helper internals", () => {
     expect(imports.has("registerServiceIdentifier")).toBe(true);
   });
 
-  it("creates stub imports without duplicating runtime helpers", () => {
+  it("creates stub imports without duplicating reused bindings", () => {
     const dependencyImports: ResolvedDependencyImport[] = [
       {
         localName: "Helper",
@@ -130,18 +130,12 @@ describe("codegen helper internals", () => {
         localName: "Container",
         importPath: "alloy-di/runtime",
         originalName: "Container",
+        reusesExistingBinding: true,
       },
     ];
-    const runtimeImports = new Set([
-      "Container",
-      "dependenciesRegistry",
-      "registerServiceIdentifier",
+    const output = createStubBlock(dependencyImports, [
+      createRegistration({ importName: "LazySvc", isFactoryLazy: true }),
     ]);
-    const output = createStubBlock(
-      dependencyImports,
-      [createRegistration({ importName: "LazySvc", isFactoryLazy: true })],
-      runtimeImports,
-    );
     expect(output).toContain("import { Helper } from '/lib/helper.js';");
     expect(output).not.toContain("alloy-di/runtime");
     expect(output).toContain("class LazySvc {}");
@@ -155,6 +149,209 @@ describe("codegen helper internals", () => {
     expect(block).toContain("{ ctor: Svc, meta: {} }");
     expect(block).toContain("{ ctor: Other, meta: { scope: 'singleton' } }");
     expect(createRegistrationsBlock([])).toBe("const registrations = [];");
+  });
+});
+
+const consumerMetadata = (token: string): ServiceMetadata => ({
+  scope: ServiceScope.TRANSIENT,
+  dependencies: [
+    {
+      expression: token,
+      referencedIdentifiers: [token],
+      isLazy: false,
+    },
+  ],
+});
+
+describe("codegen local name collisions (issue #17)", () => {
+  it("renames a dependency import that collides with a factory-lazy stub", () => {
+    const metas = [
+      {
+        className: "X",
+        filePath: "/src/x.ts",
+        metadata: {
+          scope: ServiceScope.SINGLETON,
+          dependencies: [],
+          factory: {
+            expression: "Lazy(() => import('/src/x.ts').then(m => m.X))",
+            referencedIdentifiers: [],
+            isLazy: true,
+          },
+        },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            { expression: "X", referencedIdentifiers: ["X"], isLazy: false },
+          ],
+        },
+        referencedImports: [
+          { name: "X", path: "/src/dep/x.ts", originalName: "X" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain("class X {}");
+    expect(code).toContain("import { X as X_1 } from '/src/dep/x.ts';");
+    expect(code).toContain("dependencies: () => [X_1]");
+  });
+
+  it("imports the real service when a dependency import shares its name", () => {
+    const metas = [
+      {
+        className: "Y",
+        filePath: "/src/y.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            { expression: "Y", referencedIdentifiers: ["Y"], isLazy: false },
+          ],
+        },
+        referencedImports: [
+          { name: "Y", path: "/src/tokens.ts", originalName: "Y" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    // The service keeps its name and its own import; the unrelated token
+    // import is renamed instead of silently replacing the service binding.
+    expect(code).toContain("import { Y } from '/src/y.ts';");
+    expect(code).toContain("import { Y as Y_1 } from '/src/tokens.ts';");
+    expect(code).toContain("{ ctor: Y, meta: { scope: 'singleton' } }");
+    expect(code).toContain("dependencies: () => [Y_1]");
+  });
+
+  it("renames an identifier const that collides with a dependency import", () => {
+    const metas = [
+      {
+        className: "Core",
+        filePath: "/src/core.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression: "CoreIdentifier",
+              referencedIdentifiers: ["CoreIdentifier"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          {
+            name: "CoreIdentifier",
+            path: "/src/ids.ts",
+            originalName: "CoreIdentifier",
+          },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain("import { CoreIdentifier } from '/src/ids.ts';");
+    expect(code).toContain(
+      "const CoreIdentifier_1 = registerServiceIdentifier(Core,",
+    );
+    expect(code).toContain("'Core': CoreIdentifier_1");
+  });
+
+  it("renames a service that collides with a runtime helper", () => {
+    const metas = [
+      {
+        className: "Container",
+        filePath: "/src/container.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain(
+      "import { Container as Container_1 } from '/src/container.ts';",
+    );
+    expect(code).toContain("{ ctor: Container_1,");
+  });
+
+  it("deduplicates dependency imports that differ only by extension", () => {
+    const metas = [
+      {
+        className: "ConsumerA",
+        filePath: "/src/consumer-a.ts",
+        metadata: consumerMetadata("Tok"),
+        referencedImports: [
+          { name: "Tok", path: "/src/tok.ts", originalName: "Tok" },
+        ],
+      },
+      {
+        className: "ConsumerB",
+        filePath: "/src/consumer-b.ts",
+        metadata: consumerMetadata("Tok"),
+        referencedImports: [
+          { name: "Tok", path: "/src/tok", originalName: "Tok" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    const tokImports = code.match(/import \{ Tok[^\n]*/g) ?? [];
+    expect(tokImports).toEqual(["import { Tok } from '/src/tok.ts';"]);
+    expect(code).not.toContain("Tok_1");
+  });
+
+  it("renames a service type import that collides with declaration imports", () => {
+    const code = generateContainerTypeDefinition(
+      [
+        {
+          className: "Container",
+          filePath: "/src/container.ts",
+          metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+        },
+      ],
+      (resolvedPath) => resolvedPath,
+    );
+    expect(code).toContain(
+      "import { Container as Container_1 } from '/src/container.ts';",
+    );
+    expect(code).toContain("Container: ServiceIdentifier<Container_1>;");
+  });
+
+  it("reuses the service binding for a dependency import of the same export", () => {
+    const metas = [
+      {
+        className: "Core",
+        filePath: "/src/core.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression: "Core",
+              referencedIdentifiers: ["Core"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "Core", path: "./core", originalName: "Core" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    const coreImports = code.match(/import \{ Core[^\n]*/g) ?? [];
+    expect(coreImports).toEqual(["import { Core } from '/src/core.ts';"]);
+    expect(code).toContain("dependencies: () => [Core]");
   });
 });
 
