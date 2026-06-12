@@ -212,12 +212,42 @@ interface IdentifierEdit {
 }
 
 /**
+ * True when an identifier occupies a name position rather than referencing a
+ * binding: property-access names (`ns.Api`), object keys — including method
+ * and accessor keys (`{ Api() {} }`, `{ get Api() {} }`) — class member
+ * names, qualified names, and destructuring property names.
+ */
+function isNonReferencePosition(node: ts.Identifier): boolean {
+  const parent = node.parent;
+  if (ts.isPropertyAccessExpression(parent)) {
+    return parent.name === node;
+  }
+  if (ts.isQualifiedName(parent)) {
+    return parent.right === node;
+  }
+  if (ts.isBindingElement(parent)) {
+    return parent.propertyName === node;
+  }
+  if (
+    ts.isPropertyAssignment(parent) ||
+    ts.isMethodDeclaration(parent) ||
+    ts.isGetAccessorDeclaration(parent) ||
+    ts.isSetAccessorDeclaration(parent) ||
+    ts.isPropertyDeclaration(parent) ||
+    ts.isMethodSignature(parent) ||
+    ts.isPropertySignature(parent)
+  ) {
+    return parent.name === node;
+  }
+  return false;
+}
+
+/**
  * Decide how to rewrite one identifier node, or skip it.
  *
- * Only binding references are rewritten: property-access names (`ns.Api`),
- * object keys (`{ Api: ... }`), and string/comment content keep their text.
- * Shorthand properties expand (`{ Api }` -> `{ Api: Api_1 }`) so the key
- * survives the rename.
+ * Only binding references are rewritten: name positions and string/comment
+ * content keep their text. Shorthand properties expand
+ * (`{ Api }` -> `{ Api: Api_1 }`) so the key survives the rename.
  */
 function createIdentifierEdit(
   node: ts.Identifier,
@@ -225,12 +255,7 @@ function createIdentifierEdit(
   replacement: string,
 ): IdentifierEdit | undefined {
   const parent = node.parent;
-  if (
-    ((ts.isPropertyAccessExpression(parent) ||
-      ts.isPropertyAssignment(parent)) &&
-      parent.name === node) ||
-    (ts.isQualifiedName(parent) && parent.right === node)
-  ) {
+  if (isNonReferencePosition(node)) {
     return undefined;
   }
 

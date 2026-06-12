@@ -454,6 +454,44 @@ describe("dependency expression identifier rewriting (issue #25)", () => {
     expect(code).not.toContain("cfg.Y_1");
   });
 
+  it("does not rewrite method or accessor keys that match a renamed import", () => {
+    const metas = [
+      {
+        className: "Heavy",
+        filePath: "/src/heavy.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression:
+                "make({ Heavy() { return Heavy; } }, { get Heavy() { return Heavy; } })",
+              referencedIdentifiers: ["make", "Heavy"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "make", path: "/src/make.ts", originalName: "make" },
+          { name: "Heavy", path: "/src/other/heavy.ts", originalName: "Heavy" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain(
+      "import { Heavy as Heavy_1 } from '/src/other/heavy.ts';",
+    );
+    // Method and getter keys keep their names; the references inside the
+    // bodies follow the rename.
+    expect(code).toContain(
+      "make({ Heavy() { return Heavy_1; } }, { get Heavy() { return Heavy_1; } })",
+    );
+  });
+
   it("expands shorthand properties so object keys survive a rename", () => {
     const metas = [
       {
