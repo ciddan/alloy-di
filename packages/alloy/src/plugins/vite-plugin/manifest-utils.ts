@@ -155,9 +155,20 @@ function readManifestByVersion(manifest: AlloyManifest): LoadedManifest | null {
     : readManifestV1(manifest);
 }
 
+function warnInvalidManifest(manifest: AlloyManifest, error: z.ZodError): void {
+  const packageName =
+    typeof manifest.packageName === "string" && manifest.packageName
+      ? manifest.packageName
+      : "<unknown package>";
+  console.warn(
+    `[alloy] Ignoring invalid manifest "${packageName}" — its services and providers will not be registered:\n${z.prettifyError(error)}`,
+  );
+}
+
 function readManifestV1(manifest: AlloyManifest): LoadedManifestV1 | null {
   const parsed = manifestSchemaV1.safeParse(manifest);
   if (!parsed.success) {
+    warnInvalidManifest(manifest, parsed.error);
     return null;
   }
 
@@ -175,6 +186,7 @@ function readManifestV1(manifest: AlloyManifest): LoadedManifestV1 | null {
 function readManifestV2(manifest: AlloyManifest): LoadedManifestV2 | null {
   const parsed = manifestSchemaV2.safeParse(manifest);
   if (!parsed.success) {
+    warnInvalidManifest(manifest, parsed.error);
     return null;
   }
 
