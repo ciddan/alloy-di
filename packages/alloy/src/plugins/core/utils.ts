@@ -53,19 +53,54 @@ export function createSymbolKey(filePath: string, className: string): string {
   return `alloy:${normalizedPath}#${className}`;
 }
 
-export function walkSync(dir: string, fileList: string[] = []): string[] {
-  if (!fs.existsSync(dir)) {
+export function walkSync(
+  dir: string,
+  fileList: string[] = [],
+  visitedDirs?: Set<string>,
+): string[] {
+  // Directories are tracked by real path so symlink cycles (e.g. a link
+  // under src/ pointing back at an ancestor) terminate instead of recursing
+  // forever. Symlinked directories are still followed — once.
+  const visited = visitedDirs ?? new Set<string>();
+  let realDir: string;
+
+  try {
+    realDir = fs.realpathSync(dir);
+  } catch {
     return fileList;
   }
-  const files = fs.readdirSync(dir);
-  files.forEach((file) => {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat.isDirectory()) {
-      walkSync(filePath, fileList);
-    } else {
-      fileList.push(filePath);
+
+  if (visited.has(realDir)) {
+    return fileList;
+  }
+
+  visited.add(realDir);
+
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name.startsWith(".")) {
+      continue;
     }
-  });
+
+    const filePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkSync(filePath, fileList, visited);
+    } else if (entry.isFile()) {
+      fileList.push(filePath);
+    } else if (entry.isSymbolicLink()) {
+      let stat: fs.Stats;
+      try {
+        stat = fs.statSync(filePath);
+      } catch {
+        continue; // broken link
+      }
+
+      if (stat.isDirectory()) {
+        walkSync(filePath, fileList, visited);
+      } else if (stat.isFile()) {
+        fileList.push(filePath);
+      }
+    }
+  }
+
   return fileList;
 }

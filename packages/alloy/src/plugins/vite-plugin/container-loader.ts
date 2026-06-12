@@ -33,6 +33,8 @@ export interface LoadVirtualContainerOptions {
   resolvedRoot: string;
   containerDeclarationDir?: string;
   resolvedVisualization: ResolvedVisualizationOptions | null;
+  /** Bundler-resolved mode, injected into the generated module when known. */
+  isDevMode?: boolean;
 }
 
 export async function loadVirtualContainerModule(
@@ -75,7 +77,9 @@ export async function loadVirtualContainerModule(
   reconcileLazySet(metas, lazyClassKeys, eagerReferencedNames);
   augmentFactoryLazyServices(metas, options.lazyServiceKeys);
 
-  const code = generateContainerModule(metas, lazyClassKeys, providerImports);
+  const code = generateContainerModule(metas, lazyClassKeys, providerImports, {
+    isDev: options.isDevMode,
+  });
 
   writeTypeDefinitions(
     metas,

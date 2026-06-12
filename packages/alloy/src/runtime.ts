@@ -1,4 +1,6 @@
 export { Container } from "./lib/container";
+export { setEnvDetectionOverrides } from "./lib/env-detection";
+export type { EnvDetectionOverrides } from "./lib/env-detection";
 export {
   dependenciesRegistry,
   Injectable,

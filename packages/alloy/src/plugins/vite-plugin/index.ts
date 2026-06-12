@@ -68,6 +68,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   let resolvedRoot = process.cwd();
   let packageName = "UNKNOWN_PACKAGE";
   let resolvedVisualization: ResolvedVisualizationOptions | null = null;
+  let isDevMode: boolean | undefined;
 
   const lazyServiceKeys = new Set(
     (options.lazyServices ?? []).map(toLazyServiceKey),
@@ -81,6 +82,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
     configResolved(config) {
       resolvedRoot = config.root ?? process.cwd();
+      isDevMode = !config.isProduction;
       try {
         const pkgPath = path.resolve(resolvedRoot, "package.json");
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
@@ -210,6 +212,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           resolvedRoot,
           containerDeclarationDir: options.containerDeclarationDir,
           resolvedVisualization,
+          isDevMode,
         });
       },
     },

@@ -400,6 +400,7 @@ function buildImportsAndRegistrations(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
   providerModulePaths: string[],
+  options?: GenerateContainerModuleOptions,
 ): {
   runtimeImportStatement: string;
   registrationsBlock: string;
@@ -409,7 +410,11 @@ function buildImportsAndRegistrations(
   const hasProviderModules = providerModulePaths.length > 0;
   const activeMetas = filterActiveMetas(metas, lazyReferencedClassKeys);
   const resolver = new IdentifierResolver(activeMetas);
-  const runtimeImports = computeRuntimeImports(activeMetas, hasProviderModules);
+  const runtimeImports = computeRuntimeImports(
+    activeMetas,
+    hasProviderModules,
+    options?.isDev !== undefined,
+  );
 
   const pool = createNamePool([
     ...runtimeImports,
@@ -513,8 +518,12 @@ function enrichRegistrations(
 function computeRuntimeImports(
   activeMetas: DiscoveredMeta[],
   hasProviderModules: boolean,
+  hasEnvOverrides = false,
 ): Set<string> {
   const imports = new Set<string>(["Container", "dependenciesRegistry"]);
+  if (hasEnvOverrides) {
+    imports.add("setEnvDetectionOverrides");
+  }
   const needsLazyImport = activeMetas.some(
     (m) =>
       m.metadata.dependencies.some((d) => d.isLazy) || !!m.metadata.factory,
@@ -634,6 +643,10 @@ export const __codegenInternals = {
   createRegistrationsBlock,
 };
 
+export interface GenerateContainerModuleOptions {
+  isDev?: boolean;
+}
+
 /**
  * Generates the virtual container module code.
  * This module:
@@ -652,6 +665,7 @@ export function generateContainerModule(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
   providerModulePaths: string[],
+  options?: GenerateContainerModuleOptions,
 ): string {
   const hasProviderModules = providerModulePaths.length > 0;
   const {
@@ -663,7 +677,13 @@ export function generateContainerModule(
     metas,
     lazyReferencedClassKeys,
     providerModulePaths,
+    options,
   );
+
+  const envOverridesBlock =
+    options?.isDev === undefined
+      ? ""
+      : `\nsetEnvDetectionOverrides({ isDev: ${options.isDev} });\n`;
 
   let providerImportBlock = "";
   let providerInvocationBlock = "";
@@ -680,7 +700,7 @@ export function generateContainerModule(
   }
 
   return `
-${runtimeImportStatement}${stubsBlock}
+${runtimeImportStatement}${envOverridesBlock}${stubsBlock}
 ${providerImportBlock}
 ${registrationsBlock}
 
