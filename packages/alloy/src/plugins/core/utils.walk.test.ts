@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { walkSync } from "./utils";
 
-let tmpDir: string;
+let tmpDir: string | undefined;
 
 function makeTree(): string {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-walk-"));
