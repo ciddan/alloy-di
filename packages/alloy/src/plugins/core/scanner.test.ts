@@ -72,6 +72,55 @@ describe("scanner type-only import handling", () => {
   });
 });
 
+describe("scanner bare decorator detection (issue #21)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("warns on bare @Injectable and does not register the class", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const code = `
+      import { Injectable } from "alloy-di/runtime";
+
+      @Injectable
+      export class Oops {}
+    `;
+    const metas = runMetaScan(code);
+    expect(metas).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toMatch(
+      /\[alloy\] \/src\/example\.ts:4 applies @Injectable without calling it — use @Injectable\(\)/,
+    );
+  });
+
+  it("warns on bare namespace-form @Alloy.Singleton", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const code = `
+      import * as Alloy from "alloy-di/runtime";
+
+      @Alloy.Singleton
+      export class Oops {}
+    `;
+    const metas = runMetaScan(code);
+    expect(metas).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toContain("@Singleton without calling it");
+  });
+
+  it("does not warn for unrelated bare decorators", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const code = `
+      import { observable } from "some-library";
+
+      @observable
+      export class Plain {}
+    `;
+    const metas = runMetaScan(code);
+    expect(metas).toHaveLength(0);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("scanner decorator provenance", () => {
   let tmpDir: string | undefined;
 

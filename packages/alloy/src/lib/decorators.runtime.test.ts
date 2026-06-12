@@ -47,3 +47,40 @@ describe("Decorators runtime behavior", () => {
     expect(meta?.dependencies).toBeUndefined();
   });
 });
+
+describe("bare decorator misuse (issue #21)", () => {
+  it("throws when @Injectable is applied without parentheses", () => {
+    expect(() => {
+      @(Injectable as unknown as ClassDecorator)
+      class Oops {}
+      void Oops;
+    }).toThrow(
+      "@Injectable must be called — use @Injectable() instead of @Injectable",
+    );
+  });
+
+  it("throws when @Singleton is applied without parentheses", () => {
+    expect(() => {
+      @(Singleton as unknown as ClassDecorator)
+      class Oops {}
+      void Oops;
+    }).toThrow(
+      "@Singleton must be called — use @Singleton() instead of @Singleton",
+    );
+  });
+
+  it("still accepts a plain function expression as dependencies thunk", () => {
+    class Dep {}
+
+    @Injectable(function () {
+      return [Dep] as const;
+    })
+    class UsesDep {
+      constructor(public d: Dep) {}
+    }
+
+    const meta = dependenciesRegistry.get(UsesDep);
+    expect(meta?.scope).toBe("transient");
+    expect(meta?.dependencies?.()).toEqual([Dep]);
+  });
+});

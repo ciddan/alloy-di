@@ -168,6 +168,13 @@ function findServiceDecorator(
   }
   for (const decorator of decorators) {
     if (!ts.isCallExpression(decorator.expression)) {
+      warnOnBareAlloyDecorator(
+        decorator,
+        sourceFile,
+        fileImports,
+        id,
+        resolutionCache,
+      );
       continue;
     }
     const decoratorName = resolveDecoratorName(
@@ -185,6 +192,44 @@ function findServiceDecorator(
     }
   }
   return undefined;
+}
+
+/**
+ * Warn when an alloy decorator is applied bare (`@Injectable` instead of
+ * `@Injectable()`). The scanner only registers call-expression decorators, so
+ * the service would silently vanish from the container — and at runtime the
+ * factory throws. Surfacing the location here makes the misuse findable at
+ * build time.
+ */
+function warnOnBareAlloyDecorator(
+  decorator: ts.Decorator,
+  sourceFile: ts.SourceFile,
+  fileImports: Map<string, ImportInfo>,
+  id: string,
+  resolutionCache: DecoratorResolutionCache,
+): void {
+  if (
+    !ts.isIdentifier(decorator.expression) &&
+    !ts.isPropertyAccessExpression(decorator.expression)
+  ) {
+    return;
+  }
+  const decoratorName = resolveDecoratorName(
+    decorator.expression,
+    fileImports,
+    id,
+    new Set([id]),
+    resolutionCache,
+  );
+  if (!decoratorName) {
+    return;
+  }
+  const { line } = sourceFile.getLineAndCharacterOfPosition(
+    decorator.getStart(sourceFile),
+  );
+  console.warn(
+    `[alloy] ${id}:${line + 1} applies @${decoratorName} without calling it — use @${decoratorName}(). The class will not be registered.`,
+  );
 }
 
 function resolveDecoratorName(

@@ -150,6 +150,48 @@ function isDependenciesArg(value: unknown): value is DependenciesOption {
 }
 
 /**
+ * Detect a class constructor passed where dependency metadata was expected.
+ *
+ * Class constructors have a non-writable `prototype`; dependency thunks
+ * (arrow functions or plain functions) either lack a `prototype` descriptor
+ * or have a writable one.
+ *
+ * @param value - The argument supplied to `@Injectable`/`@Singleton`.
+ * @returns True if the value is a class constructor.
+ * @internal
+ */
+function isClassConstructor(value: unknown): boolean {
+  if (typeof value !== "function") {
+    return false;
+  }
+  const prototypeDescriptor = Object.getOwnPropertyDescriptor(
+    value,
+    "prototype",
+  );
+  return prototypeDescriptor !== undefined && !prototypeDescriptor.writable;
+}
+
+/**
+ * Reject the bare-decorator misuse `@Injectable` / `@Singleton` (no parens).
+ *
+ * Applied bare, the decorator factory itself receives the class, mistakes it
+ * for a dependencies thunk, and returns a decorator function — which legacy
+ * decorator semantics then substitute for the class. Throwing here turns that
+ * silent class replacement into an immediate, actionable error.
+ *
+ * @param value - The first argument received by the decorator factory.
+ * @param decoratorName - Public decorator name for the error message.
+ * @internal
+ */
+function assertNotBareDecorator(value: unknown, decoratorName: string): void {
+  if (isClassConstructor(value)) {
+    throw new TypeError(
+      `@${decoratorName} must be called — use @${decoratorName}() instead of @${decoratorName}`,
+    );
+  }
+}
+
+/**
  * Class decorator for declaring a DI-managed service and its dependencies.
  *
  * Overloads preserve tuple inference for both array and function dependency forms, enabling
@@ -205,6 +247,7 @@ export function Injectable(
   depsOrScope?: DependenciesOption | ServiceScope,
   scopeOverride?: ServiceScope,
 ) {
+  assertNotBareDecorator(depsOrScope, "Injectable");
   if (isDependenciesArg(depsOrScope)) {
     return createDecoratorWithDeps(
       scopeOverride ?? ServiceScope.TRANSIENT,
@@ -250,6 +293,7 @@ export function Singleton<const TDeps extends readonly DependencyItem[]>(
   dependencies: TDeps,
 ): TypedClassDecorator<TDeps>;
 export function Singleton(dependencies?: DependenciesOption) {
+  assertNotBareDecorator(dependencies, "Singleton");
   if (isDependenciesArg(dependencies)) {
     return createDecoratorWithDeps(
       ServiceScope.SINGLETON,
