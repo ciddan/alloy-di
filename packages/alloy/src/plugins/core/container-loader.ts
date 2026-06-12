@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  GENERATED_FILE_NOTICE,
   generateContainerModule,
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
 } from "./codegen";
 import type { AlloyManifest, DiscoveredMeta } from "./types";
-import { normalizeImportPath } from "./utils";
+import { normalizeImportPath, writeFileIfChanged } from "./utils";
 import { IdentifierResolver } from "./identifier-resolver";
 import {
   augmentFactoryLazyServices,
@@ -173,7 +174,7 @@ function writeTypeDefinitions(
     fs.mkdirSync(dtsDir, { recursive: true });
   }
 
-  fs.writeFileSync(path.join(dtsDir, "alloy-container.d.ts"), dtsContent);
+  writeFileIfChanged(path.join(dtsDir, "alloy-container.d.ts"), dtsContent);
 
   if (loadedManifests.length === 0) {
     return;
@@ -185,7 +186,8 @@ function writeTypeDefinitions(
       services: m.services,
     })),
   );
-  fs.writeFileSync(path.join(dtsDir, "alloy-manifests.d.ts"), manifestsDts);
+
+  writeFileIfChanged(path.join(dtsDir, "alloy-manifests.d.ts"), manifestsDts);
 }
 
 function resolveDeclarationImportPath(
@@ -219,5 +221,8 @@ function writeVisualizationArtifact(
     options: resolvedVisualization.mermaidOptions,
   });
   ensureDirectoryForFile(resolvedVisualization.outputPath);
-  fs.writeFileSync(resolvedVisualization.outputPath, `${artifact.diagram}\n`);
+  writeFileIfChanged(
+    resolvedVisualization.outputPath,
+    `%% ${GENERATED_FILE_NOTICE}\n${artifact.diagram}\n`,
+  );
 }
