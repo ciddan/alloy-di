@@ -355,6 +355,137 @@ describe("codegen local name collisions (issue #17)", () => {
   });
 });
 
+describe("dependency expression identifier rewriting (issue #25)", () => {
+  it("rewrites $-prefixed identifiers that need a rename", () => {
+    const metas = [
+      {
+        className: "$Api",
+        filePath: "/src/api.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression: "$Api",
+              referencedIdentifiers: ["$Api"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "$Api", path: "/src/tokens.ts", originalName: "$Api" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain("import { $Api } from '/src/api.ts';");
+    expect(code).toContain("import { $Api as $Api_1 } from '/src/tokens.ts';");
+    expect(code).toContain("dependencies: () => [$Api_1]");
+  });
+
+  it("leaves lazy import specifiers and property names untouched by renames", () => {
+    const metas = [
+      {
+        className: "Heavy",
+        filePath: "/src/Heavy.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression:
+                "Lazy(() => import('/src/Heavy').then((m) => m.Heavy))",
+              referencedIdentifiers: ["Heavy"],
+              isLazy: true,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "Heavy", path: "/src/other/heavy.ts", originalName: "Heavy" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    // The unrelated import is renamed, but neither the import('/src/Heavy')
+    // specifier nor the m.Heavy export access may follow the rename.
+    expect(code).toContain(
+      "import { Heavy as Heavy_1 } from '/src/other/heavy.ts';",
+    );
+    expect(code).toContain("import('/src/Heavy').then((m) => m.Heavy)");
+  });
+
+  it("does not rewrite property-access names that match a renamed import", () => {
+    const metas = [
+      {
+        className: "Y",
+        filePath: "/src/y.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression: "cfg.Y",
+              referencedIdentifiers: ["cfg", "Y"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "cfg", path: "/src/cfg.ts", originalName: "cfg" },
+          { name: "Y", path: "/src/tokens.ts", originalName: "Y" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain("import { Y as Y_1 } from '/src/tokens.ts';");
+    expect(code).toContain("dependencies: () => [cfg.Y]");
+    expect(code).not.toContain("cfg.Y_1");
+  });
+
+  it("expands shorthand properties so object keys survive a rename", () => {
+    const metas = [
+      {
+        className: "Y",
+        filePath: "/src/y.ts",
+        metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+      },
+      {
+        className: "Consumer",
+        filePath: "/src/consumer.ts",
+        metadata: {
+          scope: ServiceScope.TRANSIENT,
+          dependencies: [
+            {
+              expression: "make({ Y })",
+              referencedIdentifiers: ["make", "Y"],
+              isLazy: false,
+            },
+          ],
+        },
+        referencedImports: [
+          { name: "make", path: "/src/make.ts", originalName: "make" },
+          { name: "Y", path: "/src/tokens.ts", originalName: "Y" },
+        ],
+      },
+    ];
+    const code = generateContainerModule(metas, new Set(), []);
+    expect(code).toContain("import { Y as Y_1 } from '/src/tokens.ts';");
+    expect(code).toContain("dependencies: () => [make({ Y: Y_1 })]");
+  });
+});
+
 describe("service identifier export key generation", () => {
   it("keeps long same-prefix service identifier keys distinct", () => {
     const firstPath =

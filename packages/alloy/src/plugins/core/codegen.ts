@@ -1,4 +1,5 @@
 import path from "node:path";
+import ts from "typescript";
 import {
   createClassKey,
   normalizeImportPath,
@@ -204,6 +205,87 @@ function resolveDependencyImports(
   };
 }
 
+interface IdentifierEdit {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/**
+ * Decide how to rewrite one identifier node, or skip it.
+ *
+ * Only binding references are rewritten: property-access names (`ns.Api`),
+ * object keys (`{ Api: ... }`), and string/comment content keep their text.
+ * Shorthand properties expand (`{ Api }` -> `{ Api: Api_1 }`) so the key
+ * survives the rename.
+ */
+function createIdentifierEdit(
+  node: ts.Identifier,
+  source: ts.SourceFile,
+  replacement: string,
+): IdentifierEdit | undefined {
+  const parent = node.parent;
+  if (
+    ((ts.isPropertyAccessExpression(parent) ||
+      ts.isPropertyAssignment(parent)) &&
+      parent.name === node) ||
+    (ts.isQualifiedName(parent) && parent.right === node)
+  ) {
+    return undefined;
+  }
+
+  const start = node.getStart(source);
+  if (ts.isShorthandPropertyAssignment(parent) && parent.name === node) {
+    return { start, end: node.end, text: `${node.text}: ${replacement}` };
+  }
+  return { start, end: node.end, text: replacement };
+}
+
+/**
+ * Rewrite identifier references inside a reconstructed dependency expression.
+ *
+ * The expression is parsed and identifier nodes are replaced by position, so
+ * `$`-prefixed names rewrite correctly and occurrences inside string literals
+ * (e.g. lazy `import('/src/Api')` specifiers) and comments are untouched —
+ * the previous `\b`-regex text replacement got both wrong.
+ */
+function rewriteReferencedIdentifiers(
+  expression: string,
+  referenced: ReadonlySet<string>,
+  rewriter: (ident: string) => string,
+): string {
+  // Wrap in parentheses so expressions that start like statements (e.g.
+  // object literals) parse as expressions.
+  const wrapped = `(${expression});`;
+  const source = ts.createSourceFile(
+    "alloy-dependency-expression.ts",
+    wrapped,
+    ts.ScriptTarget.ESNext,
+    true,
+  );
+
+  const edits: IdentifierEdit[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && referenced.has(node.text)) {
+      const replacement = rewriter(node.text);
+      if (replacement && replacement !== node.text) {
+        const edit = createIdentifierEdit(node, source, replacement);
+        if (edit) {
+          edits.push(edit);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  let result = wrapped;
+  for (const edit of edits.toSorted((a, b) => b.start - a.start)) {
+    result = result.slice(0, edit.start) + edit.text + result.slice(edit.end);
+  }
+  return result.slice(1, -2);
+}
+
 function reconstructDependencyExpression(
   dep: DependencyDescriptor,
   rewriter: (s: string) => string,
@@ -211,11 +293,12 @@ function reconstructDependencyExpression(
 ): string {
   let expr = dep.expression;
 
-  for (const ident of dep.referencedIdentifiers) {
-    const replacement = rewriter(ident);
-    if (replacement && replacement !== ident) {
-      expr = expr.replaceAll(new RegExp(`\\b${ident}\\b`, "g"), replacement);
-    }
+  if (dep.referencedIdentifiers.length > 0) {
+    expr = rewriteReferencedIdentifiers(
+      expr,
+      new Set(dep.referencedIdentifiers),
+      rewriter,
+    );
   }
 
   if (dep.isLazy) {
