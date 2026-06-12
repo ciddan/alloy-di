@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  createClassKey,
-  createSymbolKey,
-  normalizeImportPath,
-} from "../core/utils";
+import { createClassKey, createSymbolKey, normalizeImportPath } from "./utils";
 import type {
   AlloyManifest,
   DiscoveredMeta,
@@ -12,8 +8,8 @@ import type {
   ManifestServiceDescriptorV1,
   ManifestServiceDescriptorV2,
   ServiceMetadata,
-} from "../core/types";
-import { IdentifierResolver } from "../core/identifier-resolver";
+} from "./types";
+import { IdentifierResolver } from "./identifier-resolver";
 
 /**
  * Manifest utility functions specific to the Vite plugin.

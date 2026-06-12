@@ -4,22 +4,22 @@ import type { Plugin } from "vite";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import type { AlloyManifest } from "../core/types";
 import { normalizeImportPath, walkSync } from "../core/utils";
-import { loadVirtualContainerModule } from "./container-loader";
+import { loadVirtualContainerModule } from "../core/container-loader";
 import {
   resolveVisualizationOptions,
   type AlloyVisualizationOptions,
   type ResolvedVisualizationOptions,
-} from "./visualization-utils";
+} from "../core/visualization-utils";
 
 export type {
   AlloyMermaidVisualizerOptions,
   AlloyVisualizationOptions,
-} from "./visualization-utils";
+} from "../core/visualization-utils";
 import {
   createDiscoveryRuntime,
-  invalidateContainerModule,
   isDiscoverableFile,
-} from "./discovery-runtime";
+} from "../core/discovery-runtime";
+import { invalidateContainerModule } from "./module-invalidation";
 
 export interface AlloyPluginOptions {
   providers?: string[];

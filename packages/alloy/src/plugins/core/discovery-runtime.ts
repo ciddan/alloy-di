@@ -1,7 +1,6 @@
-import type { ViteDevServer } from "vite";
-import { createDiscoveryStore } from "../core/discovery-store";
-import type { DiscoveredMeta } from "../core/types";
-import { createClassKey } from "../core/utils";
+import { createDiscoveryStore } from "./discovery-store";
+import type { DiscoveredMeta } from "./types";
+import { createClassKey } from "./utils";
 
 /** Files the discovery scanner processes (mirrors the transform hook filter). */
 export function isDiscoverableFile(file: string): boolean {
@@ -123,20 +122,4 @@ export function createDiscoveryRuntime(): DiscoveryRuntime {
       lazyReferencedClassKeys.clear();
     },
   };
-}
-
-/**
- * Invalidate the generated container module in every environment's module
- * graph so its `load` hook re-runs and regenerates from current discovery.
- */
-export function invalidateContainerModule(
-  server: ViteDevServer,
-  resolvedVirtualModuleId: string,
-): void {
-  for (const environment of Object.values(server.environments)) {
-    const mod = environment.moduleGraph.getModuleById(resolvedVirtualModuleId);
-    if (mod) {
-      environment.moduleGraph.invalidateModule(mod);
-    }
-  }
 }

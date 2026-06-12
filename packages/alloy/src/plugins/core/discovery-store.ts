@@ -4,8 +4,8 @@
  * Alloy discovery pipeline.
  */
 
-import { scanSource } from "../core/scanner";
-import type { DiscoveredMeta } from "../core/types";
+import { scanSource } from "./scanner";
+import type { DiscoveredMeta } from "./types";
 
 export interface DiscoveryStoreOptions {
   trackSources?: boolean;

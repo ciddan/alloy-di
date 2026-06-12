@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadVirtualContainerModule } from "./container-loader";
-import type { AlloyManifest, DiscoveredMeta } from "../core/types";
+import type { AlloyManifest, DiscoveredMeta } from "./types";
 
 function makeMetas(): DiscoveredMeta[] {
   return [

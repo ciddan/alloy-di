@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { generateMermaidDiagram } from "./visualizer";
-import type { DependencyDescriptor, DiscoveredMeta } from "../core/types";
+import type { DependencyDescriptor, DiscoveredMeta } from "./types";
 import type { ServiceScope } from "../../lib/scope";
-import { createClassKey } from "../core/utils";
+import { createClassKey } from "./utils";
 
 type ReferencedImport = NonNullable<
   DiscoveredMeta["referencedImports"]

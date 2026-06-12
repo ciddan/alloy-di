@@ -4,10 +4,10 @@ import {
   generateContainerModule,
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
-} from "../core/codegen";
-import type { AlloyManifest, DiscoveredMeta } from "../core/types";
-import { normalizeImportPath } from "../core/utils";
-import { IdentifierResolver } from "../core/identifier-resolver";
+} from "./codegen";
+import type { AlloyManifest, DiscoveredMeta } from "./types";
+import { normalizeImportPath } from "./utils";
+import { IdentifierResolver } from "./identifier-resolver";
 import {
   augmentFactoryLazyServices,
   collectEagerReferencedNames,

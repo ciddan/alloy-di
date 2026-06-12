@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 // Resolve paths used both in setup and guards
-const PKG_ROOT = path.resolve(__dirname, "../../../");
+const PKG_ROOT = path.resolve(__dirname, "../");
 const LINK_TARGET = path.join(PKG_ROOT, "node_modules", "@acme", "fixture-lib");
 
 const hasFixturePackage = () => fs.existsSync(LINK_TARGET);
@@ -38,6 +38,7 @@ describe("fixture-lib flattened subpath imports", () => {
     const mod = await import("@acme/fixture-lib/analytics-service");
     expect(typeof mod.AnalyticsService).toBe("function");
   });
+
   it("resolves event-tracker", async () => {
     if (!hasFixturePackage()) {
       expect(true).toBe(true);
@@ -47,6 +48,7 @@ describe("fixture-lib flattened subpath imports", () => {
     const mod = await import("@acme/fixture-lib/event-tracker");
     expect(typeof mod.EventTracker).toBe("function");
   });
+
   it("resolves user-session", async () => {
     if (!hasFixturePackage()) {
       expect(true).toBe(true);
@@ -56,6 +58,7 @@ describe("fixture-lib flattened subpath imports", () => {
     const mod = await import("@acme/fixture-lib/user-session");
     expect(typeof mod.UserSession).toBe("function");
   });
+
   it("manifest importPaths align & are loadable", async () => {
     if (!hasFixturePackage()) {
       expect(true).toBe(true);

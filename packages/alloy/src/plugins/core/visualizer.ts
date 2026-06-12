@@ -1,12 +1,12 @@
 import path from "node:path";
-import type { DependencyDescriptor, DiscoveredMeta } from "../core/types";
+import type { DependencyDescriptor, DiscoveredMeta } from "./types";
 import type { ServiceScope } from "../../lib/scope";
 import {
   createClassKey,
   createSymbolKey,
   hashString,
   normalizeImportPath,
-} from "../core/utils";
+} from "./utils";
 
 type GraphNodeType = "service" | "token";
 
