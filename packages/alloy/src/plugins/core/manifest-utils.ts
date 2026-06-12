@@ -12,7 +12,7 @@ import type {
 import { IdentifierResolver } from "./identifier-resolver";
 
 /**
- * Manifest utility functions specific to the Vite plugin.
+ * Bundler-agnostic manifest utilities for the container generation pipeline.
  *
  * Responsibilities:
  *  - Read and parse emitted internal library manifest modules
