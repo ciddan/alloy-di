@@ -1,5 +1,11 @@
 # @alloy-di/example-app
 
+## 0.0.6
+
+### Patch Changes
+
+- @alloy-di/example-library-internal@0.0.7
+
 ## 0.0.5
 
 ### Patch Changes
