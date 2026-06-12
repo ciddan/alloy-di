@@ -104,7 +104,25 @@ describe("scanner bare decorator detection (issue #21)", () => {
     const metas = runMetaScan(code);
     expect(metas).toHaveLength(0);
     expect(warnSpy).toHaveBeenCalledOnce();
-    expect(warnSpy.mock.calls[0][0]).toContain("@Singleton without calling it");
+    expect(warnSpy.mock.calls[0][0]).toContain(
+      "applies @Alloy.Singleton without calling it — use @Alloy.Singleton()",
+    );
+  });
+
+  it("suggests the local alias for aliased bare imports", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const code = `
+      import { Injectable as Inj } from "alloy-di/runtime";
+
+      @Inj
+      export class Oops {}
+    `;
+    const metas = runMetaScan(code);
+    expect(metas).toHaveLength(0);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0][0]).toContain(
+      "applies @Inj without calling it — use @Inj()",
+    );
   });
 
   it("does not warn for unrelated bare decorators", () => {

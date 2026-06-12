@@ -227,8 +227,9 @@ function warnOnBareAlloyDecorator(
   const { line } = sourceFile.getLineAndCharacterOfPosition(
     decorator.getStart(sourceFile),
   );
+  const appliedText = decorator.expression.getText(sourceFile);
   console.warn(
-    `[alloy] ${id}:${line + 1} applies @${decoratorName} without calling it — use @${decoratorName}(). The class will not be registered.`,
+    `[alloy] ${id}:${line + 1} applies @${appliedText} without calling it — use @${appliedText}(). The class will not be registered.`,
   );
 }
 
