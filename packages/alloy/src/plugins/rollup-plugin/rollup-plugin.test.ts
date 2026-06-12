@@ -1,7 +1,16 @@
-import { describe, it, expect } from "vitest";
 import fs from "fs";
-import { alloy } from "../../rollup";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+
 import type { AlloyManifest } from "../core/types";
+import { alloy } from "../../rollup";
+
+beforeEach(() => {
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // Helper to simulate Rollup plugin lifecycle for the manifest plugin.
 function runPlugin(

@@ -7,7 +7,8 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       reportsDirectory: "./analytics/coverage",
     },
-    globals: false,
     environment: "node",
+    globals: false,
+    silent: "passed-only",
   },
 });
