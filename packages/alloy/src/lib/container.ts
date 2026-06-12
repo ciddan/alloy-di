@@ -385,7 +385,7 @@ export class Container {
     // Handle both default and named exports
     const depClass =
       typeof module === "object" && module !== null && "default" in module
-        ? (module as { default: unknown }).default
+        ? module.default
         : module;
 
     // Validate imported value is a constructor
