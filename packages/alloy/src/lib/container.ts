@@ -358,8 +358,12 @@ export class Container {
   }
 
   /**
-   * Execute a lazy importer with optional retry/backoff semantics.
-   * Implements exponential backoff for transient network failures.
+   * Execute a lazy importer with optional retry/backoff semantics, then
+   * validate that the imported value is a constructor.
+   *
+   * Only the dynamic import itself is retried; a successful import that does
+   * not yield a constructor is deterministic and fails immediately without
+   * backoff or re-wrapping.
    *
    * @param lazyDep - Lazy dependency wrapper with importer function and retry config
    * @param target - Service being resolved (for error messages)
@@ -372,7 +376,41 @@ export class Container {
     target: Constructor,
     resolutionStack: Constructor[],
   ): Promise<Constructor> {
-    const runImport = async () => await lazyDep.importer();
+    const module = await this.runImporterWithRetry(
+      lazyDep,
+      target,
+      resolutionStack,
+    );
+
+    // Handle both default and named exports
+    const depClass =
+      typeof module === "object" && module !== null && "default" in module
+        ? (module as { default: unknown }).default
+        : module;
+
+    // Validate imported value is a constructor
+    if (!isConstructor(depClass)) {
+      const stackPath = this.formatStackPath(target, resolutionStack);
+      throw new DependencyResolutionError(
+        `Lazy importer did not return a class for dependency while resolving ${target.name}. Resolution stack: ${stackPath}. Received type: ${typeof depClass}`,
+        {
+          target,
+          resolutionStack,
+          failedDependency: depClass,
+        },
+      );
+    }
+    return depClass;
+  }
+
+  /**
+   * Run a lazy importer, retrying failed imports with exponential backoff.
+   */
+  private async runImporterWithRetry(
+    lazyDep: Lazy<unknown>,
+    target: Constructor,
+    resolutionStack: Constructor[],
+  ): Promise<unknown> {
     const retries = lazyDep.retry?.retries ?? 0;
     const baseDelay = lazyDep.retry?.backoffMs ?? 0;
     const factor = lazyDep.retry?.factor ?? 2;
@@ -381,27 +419,7 @@ export class Container {
     // Retry loop with exponential backoff
     while (true) {
       try {
-        const module = await runImport();
-
-        // Handle both default and named exports
-        const depClass =
-          typeof module === "object" && module !== null && "default" in module
-            ? (module as { default: unknown }).default
-            : module;
-
-        // Validate imported value is a constructor
-        if (!isConstructor(depClass)) {
-          const stackPath = this.formatStackPath(target, resolutionStack);
-          throw new DependencyResolutionError(
-            `Lazy importer did not return a class for dependency while resolving ${target.name}. Resolution stack: ${stackPath}. Received type: ${typeof depClass}`,
-            {
-              target,
-              resolutionStack,
-              failedDependency: depClass,
-            },
-          );
-        }
-        return depClass;
+        return await lazyDep.importer();
       } catch (err: unknown) {
         // Check if we've exhausted all retry attempts
         if (attempt >= retries) {
