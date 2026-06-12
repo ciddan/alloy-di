@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceScope } from "../../lib/scope";
-import { scanSource } from "./scanner";
+import { __scannerInternals, scanSource } from "./scanner";
 
 const runImportsScan = (code: string) =>
   scanSource(code, "/src/example.ts").metas[0]?.referencedImports ?? [];
@@ -69,6 +70,32 @@ describe("scanner type-only import handling", () => {
       originalName: "*",
       isTypeOnly: true,
     });
+  });
+});
+
+describe("scanner parse pre-filter (issue #22)", () => {
+  const { mayContainDiscoverableSyntax } = __scannerInternals;
+
+  it("rejects files without decorator or Lazy syntax", () => {
+    expect(
+      mayContainDiscoverableSyntax(
+        `import { helper } from "./helper";\nexport const value = helper(1);\n`,
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts files containing Lazy references", () => {
+    expect(
+      mayContainDiscoverableSyntax(
+        `import { Lazy } from "alloy-di/runtime";\nexport const dep = Lazy(() => import("./heavy"));\n`,
+      ),
+    ).toBe(true);
+  });
+
+  it("returns an empty result for filtered files", () => {
+    const result = scanSource(`export const value = 1;\n`, "/src/plain.ts");
+    expect(result.metas).toHaveLength(0);
+    expect(result.lazyClassKeys.size).toBe(0);
   });
 });
 

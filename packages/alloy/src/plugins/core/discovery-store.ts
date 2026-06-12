@@ -4,8 +4,13 @@
  * Alloy discovery pipeline.
  */
 
+import crypto from "node:crypto";
 import { scanSource } from "./scanner";
 import type { DiscoveredMeta } from "./types";
+
+function hashContent(code: string): string {
+  return crypto.createHash("sha1").update(code).digest("hex");
+}
 
 export interface DiscoveryStoreOptions {
   trackSources?: boolean;
@@ -44,6 +49,7 @@ export function createDiscoveryStore(
 ): DiscoveryStore {
   const fileMetas = new Map<string, DiscoveredMeta[]>();
   const fileLazyRefs = new Map<string, Set<string>>();
+  const fileContentHashes = new Map<string, string>();
   const fileSources = options.trackSources
     ? new Map<string, string>()
     : undefined;
@@ -58,6 +64,19 @@ export function createDiscoveryStore(
   function updateFile(id: string, code: string): DiscoveryStoreUpdate {
     const previousMetas = fileMetas.get(id);
     const previousLazyClassKeys = fileLazyRefs.get(id);
+
+    // Identical content yields identical scan results, so serve them from
+    // the cache.
+    const contentHash = hashContent(code);
+    if (fileContentHashes.get(id) === contentHash) {
+      return {
+        metas: previousMetas ?? [],
+        lazyClassKeys: new Set(previousLazyClassKeys),
+        previousMetas,
+        previousLazyClassKeys,
+      };
+    }
+    fileContentHashes.set(id, contentHash);
 
     if (fileSources) {
       fileSources.set(id, code);
@@ -90,6 +109,7 @@ export function createDiscoveryStore(
     const previousLazyClassKeys = fileLazyRefs.get(id);
     fileMetas.delete(id);
     fileLazyRefs.delete(id);
+    fileContentHashes.delete(id);
     if (fileSources) {
       fileSources.delete(id);
     }
@@ -102,6 +122,7 @@ export function createDiscoveryStore(
   function clear(): void {
     fileMetas.clear();
     fileLazyRefs.clear();
+    fileContentHashes.clear();
     fileSources?.clear();
   }
 
