@@ -53,6 +53,32 @@ export function createSymbolKey(filePath: string, className: string): string {
   return `alloy:${normalizedPath}#${className}`;
 }
 
+const lastWrittenContent = new Map<string, string>();
+
+/**
+ * Write a generated artifact only when its content actually changed.
+ *
+ * @returns true when the file was written, false when it already matched.
+ */
+export function writeFileIfChanged(filePath: string, content: string): boolean {
+  if (lastWrittenContent.get(filePath) === content) {
+    return false;
+  }
+
+  try {
+    if (fs.readFileSync(filePath, "utf-8") === content) {
+      lastWrittenContent.set(filePath, content);
+      return false;
+    }
+  } catch {
+    // Missing or unreadable — fall through to the write.
+  }
+
+  fs.writeFileSync(filePath, content);
+  lastWrittenContent.set(filePath, content);
+  return true;
+}
+
 export function walkSync(
   dir: string,
   fileList: string[] = [],

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  GENERATED_FILE_HEADER,
   generateContainerModule,
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
@@ -56,6 +57,22 @@ describe("codegen import path handling", () => {
     ];
     const code = generateContainerModule(metas, new Set(), []);
     expect(code).toMatch("import { Svc } from '/home/user/project/src/svc.ts'");
+  });
+});
+
+describe("generated declaration file headers", () => {
+  it("prepends the volatility notice to the container d.ts", () => {
+    const dts = generateContainerTypeDefinition([], (p) => p);
+    expect(dts.startsWith("/**")).toBe(true);
+    expect(dts).toContain(GENERATED_FILE_HEADER);
+  });
+
+  it("prepends the volatility notice to the manifests d.ts", () => {
+    const dts = generateManifestTypeDefinition([
+      { packageName: "@scope/lib", services: [{ exportName: "Svc" }] },
+    ]);
+    expect(dts.startsWith("/**")).toBe(true);
+    expect(dts).toContain(GENERATED_FILE_HEADER);
   });
 });
 

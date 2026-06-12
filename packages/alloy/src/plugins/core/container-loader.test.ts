@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { GENERATED_FILE_NOTICE } from "./codegen";
 import { loadVirtualContainerModule } from "./container-loader";
 import type { AlloyManifest, DiscoveredMeta } from "./types";
 
@@ -31,6 +32,21 @@ function makeMetas(): DiscoveredMeta[] {
     },
   ];
 }
+
+const tmpDirs: string[] = [];
+
+function makeOutDir(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+  tmpDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  for (const dir of tmpDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 /**
  * The loader runs on every HMR-triggered container regeneration, so it must
@@ -65,7 +81,7 @@ describe("loadVirtualContainerModule input isolation", () => {
     const lazyReferencedClassKeys = new Set(["/src/core.ts::Core"]);
     // Matches the identifierKey the loader assigns for resolvedRoot "/".
     const lazyServiceKeys = new Set(["alloy:test-pkg/src/core.ts#Core"]);
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
 
     await loadVirtualContainerModule({
       localMetas,
@@ -90,7 +106,7 @@ describe("loadVirtualContainerModule input isolation", () => {
   });
 
   it("produces identical output when invoked twice with the same inputs", async () => {
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-loader-"));
+    const outDir = makeOutDir();
     const load = () =>
       loadVirtualContainerModule({
         localMetas: makeMetas(),
@@ -107,5 +123,51 @@ describe("loadVirtualContainerModule input isolation", () => {
     const first = await load();
     const second = await load();
     expect(second.code).toBe(first.code);
+  });
+
+  it("does not rewrite unchanged artifacts on regeneration (issue #23)", async () => {
+    const outDir = makeOutDir();
+    const load = () =>
+      loadVirtualContainerModule({
+        localMetas: makeMetas(),
+        lazyReferencedClassKeys: new Set<string>(),
+        manifests: [manifestWithLazyDep],
+        providerImportPaths: [],
+        lazyServiceKeys: new Set<string>(),
+        packageName: "test-pkg",
+        resolvedRoot: "/",
+        containerDeclarationDir: outDir,
+        resolvedVisualization: {
+          outputPath: path.join(outDir, "alloy-di.mmd"),
+        },
+      });
+
+    await load();
+    const writeSpy = vi.spyOn(fs, "writeFileSync");
+    await load();
+    const artifactWrites = writeSpy.mock.calls.filter(
+      ([target]) => typeof target === "string" && target.startsWith(outDir),
+    );
+    expect(artifactWrites).toHaveLength(0);
+  });
+
+  it("prepends the generated-file notice to the mermaid artifact", async () => {
+    const outDir = makeOutDir();
+    const mermaidPath = path.join(outDir, "alloy-di.mmd");
+
+    await loadVirtualContainerModule({
+      localMetas: makeMetas(),
+      lazyReferencedClassKeys: new Set<string>(),
+      manifests: [],
+      providerImportPaths: [],
+      lazyServiceKeys: new Set<string>(),
+      packageName: "test-pkg",
+      resolvedRoot: "/",
+      containerDeclarationDir: outDir,
+      resolvedVisualization: { outputPath: mermaidPath },
+    });
+
+    const mermaid = fs.readFileSync(mermaidPath, "utf-8");
+    expect(mermaid.startsWith(`%% ${GENERATED_FILE_NOTICE}\n`)).toBe(true);
   });
 });
