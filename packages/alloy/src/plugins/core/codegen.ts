@@ -839,6 +839,8 @@ declare module "alloy-di/runtime" {
 ${members}
   }
 }
+
+export {};
 `;
 }
 
