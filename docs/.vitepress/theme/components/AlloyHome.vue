@@ -51,28 +51,22 @@ const categories = {
 
 const features = [
   {
-    category: "buildtime",
-    title: "Static resolution",
-    desc: "Alloy scans your source at build time to emit a static dependency graph — no reflection, minimal runtime.",
-    icon: "cpu",
-  },
-  {
-    category: "safety",
-    title: "Errors caught at build time",
-    desc: "Circular dependencies and duplicate registrations fail the build — not a request in production.",
-    icon: "check",
-  },
-  {
     category: "performance",
     title: "First-class lazy loading",
     desc: "Granular code-splitting per service via Lazy() and dynamic imports. Pay only for what's needed.",
     icon: "layers",
   },
   {
-    category: "safety",
-    title: "Fully type-safe",
-    desc: "Generates TypeScript definitions for every service identifier. Your IDE knows the whole graph.",
-    icon: "shield",
+    category: "compatibility",
+    title: "Framework agnostic",
+    desc: "Works with React, Vue, Svelte, or vanilla TypeScript. It's just a Vite plugin.",
+    icon: "puzzle",
+  },
+  {
+    category: "buildtime",
+    title: "Static resolution",
+    desc: "Alloy scans your source at build time to emit a static dependency graph — no reflection, minimal runtime.",
+    icon: "cpu",
   },
   {
     category: "buildtime",
@@ -81,10 +75,16 @@ const features = [
     icon: "graph",
   },
   {
-    category: "compatibility",
-    title: "Framework agnostic",
-    desc: "Works with React, Vue, Svelte, or vanilla TypeScript. It's just a Vite plugin.",
-    icon: "puzzle",
+    category: "safety",
+    title: "Errors caught at build time",
+    desc: "Circular dependencies and duplicate registrations fail the build — not a request in production.",
+    icon: "check",
+  },
+  {
+    category: "safety",
+    title: "Fully type-safe",
+    desc: "Generates TypeScript definitions for every service identifier. Your IDE knows the whole graph.",
+    icon: "shield",
   },
 ];
 
@@ -102,7 +102,7 @@ const benefits = [
     label: "Inspect dependencies",
     link: "/guide/visualization",
   },
-  { num: "Automock", label: "Test container", link: "/guide/testing" },
+  { num: "Test", label: "Easy mocking", link: "/guide/testing" },
 ];
 </script>
 
@@ -239,64 +239,54 @@ const benefits = [
         :class="`fc-${categories[f.category].color}`"
       >
         <div class="feature-body">
-          <span class="feature-tag">{{ categories[f.category].label }}</span>
+          <span class="feature-tag">
+            <svg
+              class="feature-tag-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <template v-if="f.icon === 'cpu'">
+                <path
+                  d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z"
+                />
+                <path d="M9 9h6v6h-6z" />
+                <path
+                  d="M3 10h2M3 14h2M10 3v2M14 3v2M21 10h-2M21 14h-2M14 21v-2M10 21v-2"
+                />
+              </template>
+              <template v-else-if="f.icon === 'check'">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M8.5 12l2.5 2.5l4.5 -5" />
+              </template>
+              <template v-else-if="f.icon === 'layers'">
+                <path d="M13 2L3 14h9l-1 8l10 -12h-9l1 -8z" />
+              </template>
+              <template v-else-if="f.icon === 'graph'">
+                <circle cx="6" cy="6" r="2.5" />
+                <circle cx="6" cy="18" r="2.5" />
+                <circle cx="18" cy="12" r="2.5" />
+                <path d="M8.2 7.2l7.6 3.6M8.2 16.8l7.6 -3.6" />
+              </template>
+              <template v-else-if="f.icon === 'puzzle'">
+                <path
+                  d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
+                />
+              </template>
+              <template v-else>
+                <path d="M8 9l-4 3l4 3" />
+                <path d="M16 9l4 3l-4 3" />
+                <path d="M13 7l-2 10" />
+              </template>
+            </svg>
+            {{ categories[f.category].label }}
+          </span>
           <p class="feature-title">{{ f.title }}</p>
           <p class="feature-desc">{{ f.desc }}</p>
-        </div>
-        <div class="feature-art">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <!-- Static resolution: chip -->
-            <template v-if="f.icon === 'cpu'">
-              <path
-                d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z"
-              />
-              <path d="M9 9h6v6h-6z" />
-              <path
-                d="M3 10h2M3 14h2M10 3v2M14 3v2M21 10h-2M21 14h-2M14 21v-2M10 21v-2"
-              />
-            </template>
-
-            <!-- Errors caught at build time: circle-check -->
-            <template v-else-if="f.icon === 'check'">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M8.5 12l2.5 2.5l4.5 -5" />
-            </template>
-
-            <!-- Performance: lightning bolt -->
-            <template v-else-if="f.icon === 'layers'">
-              <path d="M13 2L3 14h9l-1 8l10 -12h-9l1 -8z" />
-            </template>
-
-            <!-- Visualized graph: node graph -->
-            <template v-else-if="f.icon === 'graph'">
-              <circle cx="6" cy="6" r="2.5" />
-              <circle cx="6" cy="18" r="2.5" />
-              <circle cx="18" cy="12" r="2.5" />
-              <path d="M8.2 7.2l7.6 3.6M8.2 16.8l7.6 -3.6" />
-            </template>
-
-            <!-- Framework agnostic: puzzle piece -->
-            <template v-else-if="f.icon === 'puzzle'">
-              <path
-                d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
-              />
-            </template>
-
-            <!-- Fully type-safe: code brackets -->
-            <template v-else>
-              <path d="M8 9l-4 3l4 3" />
-              <path d="M16 9l4 3l-4 3" />
-              <path d="M13 7l-2 10" />
-            </template>
-          </svg>
         </div>
       </div>
     </div>
