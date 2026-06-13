@@ -225,53 +225,67 @@ const benefits = [
     <div class="alloy-features">
       <div v-for="f in features" :key="f.title" class="feature-card">
         <span v-if="f.tag" class="feature-tag">{{ f.tag }}</span>
-        <div class="feature-icon">
+        <div class="feature-art">
           <svg
-            viewBox="0 0 24 24"
+            viewBox="0 0 48 48"
             fill="none"
             stroke="currentColor"
-            stroke-width="1.75"
+            stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
           >
+            <!-- Static resolution: a chip resolving an internal graph -->
             <template v-if="f.icon === 'cpu'">
+              <rect class="art-fill" x="13" y="13" width="22" height="22" rx="5" />
               <path
-                d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z"
+                d="M19 7v6M29 7v6M19 35v6M29 35v6M7 19h6M7 29h6M35 19h6M35 29h6"
               />
-              <path d="M9 9h6v6h-6z" />
-              <path
-                d="M3 10h2M3 14h2M10 3v2M14 3v2M21 10h-2M21 14h-2M14 21v-2M10 21v-2"
-              />
+              <path d="M22 21.5l5 -1M21 23l3.5 4.5M28 21l-2.5 6" />
+              <circle class="art-fill" cx="20" cy="21" r="2.2" />
+              <circle class="art-fill" cx="29" cy="20" r="2.2" />
+              <circle class="art-key" cx="25" cy="29" r="2.8" />
             </template>
+            <!-- Lazy loading: a bundle splitting into dynamically imported chunks -->
             <template v-else-if="f.icon === 'layers'">
-              <path
-                d="M8 5a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z"
-              />
-              <path
-                d="M4 9a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z"
-              />
+              <rect class="art-fill" x="6" y="15" width="18" height="18" rx="4" />
+              <path d="M24 21l7 -6" stroke-dasharray="2.5 3" />
+              <path d="M24 27l7 6" stroke-dasharray="2.5 3" />
+              <rect x="31" y="8" width="11" height="11" rx="3" />
+              <rect x="31" y="29" width="11" height="11" rx="3" />
             </template>
+            <!-- Framework agnostic: a plug-in puzzle piece -->
             <template v-else-if="f.icon === 'puzzle'">
-              <path
-                d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
-              />
+              <g transform="scale(2)">
+                <path
+                  class="art-fill"
+                  vector-effect="non-scaling-stroke"
+                  d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
+                />
+              </g>
             </template>
+            <!-- Errors caught at build time: a shield with a check -->
             <template v-else-if="f.icon === 'check'">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M8.5 12l2.5 2.5l4.5 -5" />
-            </template>
-            <template v-else-if="f.icon === 'graph'">
-              <circle cx="6" cy="6" r="2.5" />
-              <circle cx="6" cy="18" r="2.5" />
-              <circle cx="18" cy="12" r="2.5" />
-              <path d="M8.2 7.2l7.6 3.6M8.2 16.8l7.6 -3.6" />
-            </template>
-            <template v-else>
               <path
-                d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"
+                class="art-fill"
+                d="M24 5l15 5v10c0 10 -6.5 16.5 -15 20.5c-8.5 -4 -15 -10.5 -15 -20.5v-10z"
               />
-              <path d="M9 12l2 2l4 -4" />
+              <path d="M16 24l5.5 5.5l11 -12" />
+            </template>
+            <!-- Visualized graph: a small dependency DAG -->
+            <template v-else-if="f.icon === 'graph'">
+              <path d="M10 14L24 24L10 36M24 24L38 14M24 24L38 36" />
+              <circle class="art-fill" cx="10" cy="14" r="3.2" />
+              <circle class="art-fill" cx="10" cy="36" r="3.2" />
+              <circle class="art-fill" cx="38" cy="14" r="3.2" />
+              <circle class="art-fill" cx="38" cy="36" r="3.2" />
+              <circle class="art-key" cx="24" cy="24" r="4" />
+            </template>
+            <!-- Fully type-safe: a code/type glyph -->
+            <template v-else>
+              <path d="M18 16L9 24l9 8" />
+              <path d="M30 16l9 8l-9 8" />
+              <path d="M26 13l-4 22" />
             </template>
           </svg>
         </div>
