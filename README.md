@@ -10,7 +10,7 @@ Please visit [alloy-di.dev](https://alloy-di.dev) for full documentation.
 
 # Alloy Monorepo
 
-A compile-time dependency injection (DI) system purpose-built for the Vite ecosystem. This monorepo contains:
+A build-time dependency injection (DI) system purpose-built for the Vite ecosystem. This monorepo contains:
 
 - **`packages/alloy`** – Vite plugin + minimal runtime. For detailed documentation on its API and features, please see the [package README](./packages/alloy/README.md).
 - **`packages/examples/app`** – Demonstrates service declaration, singleton vs transient scope, lazy/async dependency loading, and automatic code-splitting. For more details see the [app README](./packages/examples/app/README.md).

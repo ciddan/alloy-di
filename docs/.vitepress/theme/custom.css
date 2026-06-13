@@ -16,6 +16,12 @@
   --alloy-accent: #3b6ea5;
   --alloy-accent-bright: #6daacf;
 
+  /* Card accent hues — light theme (deeper for contrast on white) */
+  --alloy-c-blue: #3b6ea5;
+  --alloy-c-teal: #0e9384;
+  --alloy-c-amber: #b76e00;
+  --alloy-c-violet: #7c4dde;
+
   /* Light theme surfaces & ink */
   --alloy-bg: #ffffff;
   --alloy-bg-soft: #f4f7fa;
@@ -49,6 +55,13 @@
   --alloy-faint: #4a6275;
   --alloy-label: #6a8595;
   --alloy-accent-ink: #6daacf;
+
+  /* Card accent hues — dark theme (brighter / more luminous) */
+  --alloy-c-blue: #6daacf;
+  --alloy-c-teal: #2dd4bf;
+  --alloy-c-amber: #fbbf24;
+  --alloy-c-violet: #b69cff;
+
   --alloy-border: rgba(142, 175, 194, 0.12);
   --alloy-border-strong: rgba(142, 175, 194, 0.25);
   --alloy-accent-border: rgba(59, 110, 165, 0.35);
@@ -133,6 +146,12 @@ h1.hero-headline,
 .alloy-landing .VPPage {
   background: var(--alloy-bg);
 }
+/* Contain the full-bleed hero's 100vw width without a horizontal scrollbar.
+ * `clip` (not `hidden`) avoids creating a scroll container that would break
+ * the sticky top nav. */
+.alloy-landing {
+  overflow-x: clip;
+}
 .alloy-home {
   max-width: 1152px;
   margin: 0 auto;
@@ -140,12 +159,14 @@ h1.hero-headline,
 }
 
 /* ---- HERO ---- */
+/* Full-bleed shell: the background/illustration and bottom border span the
+ * viewport, while inner content stays capped via .hero-grid below. */
 .alloy-hero {
   position: relative;
   overflow: hidden;
   border-bottom: 0.5px solid var(--alloy-border);
-  margin: 0 -24px;
-  padding: 0 24px;
+  margin-inline: calc(50% - 50vw);
+  padding: 0;
 }
 
 /* Layered backdrop: technical grid + steel glow + dependency graph */
@@ -262,36 +283,85 @@ h1.hero-headline,
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: center;
   gap: 48px;
-  padding: 80px 8px 72px;
+  /* Cap + center the content so it aligns with the rest of the page even
+   * though the hero shell is full-bleed. Side padding (24 + 8) preserves the
+   * pre-bleed gutter. */
+  max-width: 1152px;
+  margin-inline: auto;
+  padding: 80px 32px 72px;
 }
 
-.hero-eyebrow {
+/* ---- PILL (shared eyebrow / category tag) ---- */
+.pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   font-family: var(--alloy-font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--alloy-accent);
-  letter-spacing: 0.12em;
   text-transform: uppercase;
-  border: 0.5px solid var(--alloy-accent-border);
-  padding: 5px 11px;
+  color: var(--pill);
+  border: 0.5px solid color-mix(in srgb, var(--pill) 40%, transparent);
+  background: color-mix(in srgb, var(--pill) 10%, transparent);
   border-radius: 4px;
-  margin-bottom: 26px;
-  background: var(--alloy-accent-soft);
 }
-.hero-eyebrow-dot {
+.pill-icon {
+  flex: none;
+}
+.pill-dot {
+  flex: none;
   width: 6px;
   height: 6px;
-  background: var(--alloy-accent);
   border-radius: 50%;
-  box-shadow: 0 0 8px var(--alloy-accent);
+  background: var(--pill);
+  box-shadow: 0 0 8px var(--pill);
+}
+/* hue */
+.pill--accent {
+  --pill: var(--alloy-accent);
+}
+.pill--blue {
+  --pill: var(--alloy-c-blue);
+}
+.pill--teal {
+  --pill: var(--alloy-c-teal);
+}
+.pill--amber {
+  --pill: var(--alloy-c-amber);
+}
+.pill--violet {
+  --pill: var(--alloy-c-violet);
+}
+/* size */
+.pill--sm {
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  padding: 3px 7px 3px 6px;
+}
+.pill--sm .pill-icon {
+  width: 12px;
+  height: 12px;
+}
+.pill--md {
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  padding: 5px 11px;
+}
+.pill--md .pill-icon {
+  width: 14px;
+  height: 14px;
+}
+/* contextual spacing */
+.hero-content .pill {
+  margin-bottom: 26px;
+}
+.feature-body .pill {
+  margin-bottom: 14px;
 }
 
 .hero-headline {
   font-family: var(--alloy-font-display);
-  font-size: clamp(36px, 6vw, 52px);
+  font-size: clamp(40px, 6.4vw, 56px);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.04em;
@@ -309,7 +379,7 @@ h1.hero-headline,
 }
 
 .hero-desc {
-  font-size: 16px;
+  font-size: 17px;
   color: var(--alloy-muted);
   line-height: 1.7;
   margin: 0 0 36px;
@@ -326,7 +396,7 @@ h1.hero-headline,
 .btn-secondary,
 .btn-install {
   font-family: var(--alloy-font-display);
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 6px;
   cursor: pointer;
   letter-spacing: 0.02em;
@@ -361,7 +431,7 @@ h1.hero-headline,
   align-items: center;
   gap: 8px;
   font-family: var(--alloy-font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--alloy-dim);
   background: transparent;
   border: 0.5px dashed var(--alloy-border-strong);
@@ -411,7 +481,7 @@ h1.hero-headline,
   margin: 0;
   padding: 16px 16px 18px;
   font-family: var(--alloy-font-mono);
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.85;
   color: var(--alloy-muted);
   overflow-x: auto;
@@ -445,12 +515,14 @@ h1.hero-headline,
 }
 .alloy-divider-line {
   flex: 1;
-  height: 0.5px;
+  /* 1px, not 0.5px: a sub-pixel height rounds down to 0 device px at 100%
+   * zoom and the line disappears. */
+  height: 1px;
   background: var(--alloy-grid-line);
 }
 .alloy-divider-label {
   font-family: var(--alloy-font-mono);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--alloy-dim);
   letter-spacing: 0.2em;
@@ -461,73 +533,103 @@ h1.hero-headline,
 .alloy-features {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--alloy-grid-line);
-  border: 0.5px solid var(--alloy-grid-line);
-  border-radius: 10px;
-  overflow: hidden;
+  gap: 16px;
 }
 .feature-card {
-  background: var(--alloy-bg);
-  padding: 30px 26px;
+  --fc: var(--alloy-accent);
   position: relative;
-  transition: background 0.18s ease;
+  display: flex;
+  overflow: hidden;
+  background: var(--alloy-bg);
+  border: 0.5px solid var(--alloy-border);
+  border-radius: 12px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+/* Per-card accent hue */
+.fc-blue {
+  --fc: var(--alloy-c-blue);
+}
+.fc-teal {
+  --fc: var(--alloy-c-teal);
+}
+.fc-amber {
+  --fc: var(--alloy-c-amber);
+}
+.fc-violet {
+  --fc: var(--alloy-c-violet);
+}
+/* Dotted node-field, concentrated on the right and fading out toward the left
+ * through a soft elliptical mask (no hard frame); brightens on hover. */
+.feature-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--fc) 1px, transparent 1.5px);
+  background-size: 13px 13px;
+  opacity: 0.16;
+  -webkit-mask-image: radial-gradient(
+    78% 130% at 100% 50%,
+    #000 0%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(78% 130% at 100% 50%, #000 0%, transparent 74%);
+  transition: opacity 0.2s ease;
+}
+.feature-card:hover::before {
+  opacity: 0.3;
+}
+/* Accent top edge, revealed on hover (flat, per-card hue). */
+.feature-card::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--fc);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 .feature-card:hover {
-  background: var(--alloy-bg-elevated);
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--fc) 45%, transparent);
+  box-shadow: 0 14px 34px -16px color-mix(in srgb, var(--fc) 45%, transparent);
 }
-.feature-icon {
-  width: 34px;
-  height: 34px;
-  border: 0.5px solid var(--alloy-accent-border);
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 18px;
-  color: var(--alloy-accent);
-  background: var(--alloy-accent-soft);
+.feature-card:hover::after {
+  opacity: 1;
 }
-.dark .feature-icon {
-  color: var(--alloy-accent-bright);
-}
-.feature-icon svg {
-  width: 18px;
-  height: 18px;
+
+/* Left: text content */
+.feature-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  padding: 26px 24px;
 }
 .feature-title {
   font-family: var(--alloy-font-display);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--alloy-text);
   margin: 0 0 8px;
   letter-spacing: -0.01em;
 }
 .feature-desc {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--alloy-dim);
   line-height: 1.65;
   margin: 0;
 }
-.feature-tag {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  font-family: var(--alloy-font-mono);
-  font-size: 9px;
-  color: var(--alloy-accent);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border: 0.5px solid var(--alloy-accent-border);
-  padding: 3px 7px;
-  border-radius: 3px;
-}
-.dark .feature-tag {
-  color: var(--alloy-accent-bright);
-}
 
-/* ---- STATS ---- */
-.alloy-stats {
+/* ---- BENEFITS ---- */
+.alloy-benefits {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   margin-top: 24px;
@@ -535,39 +637,43 @@ h1.hero-headline,
   border-radius: 10px;
   overflow: hidden;
 }
-.stat-item {
+.benefit {
   padding: 24px 26px;
   border-right: 0.5px solid var(--alloy-grid-line);
 }
-.stat-item:last-child {
+.benefit:last-child {
   border-right: none;
 }
-.stat-item--link {
+.benefit--link {
   display: block;
   text-decoration: none;
   transition: background 0.18s ease;
 }
-.stat-item--link:hover {
+.benefit--link:hover {
   background: var(--alloy-bg-elevated);
 }
-.stat-item--link:hover .stat-num {
+.benefit--link:hover .benefit-num {
   color: var(--alloy-accent-ink);
 }
-.stat-arrow {
-  margin-left: 6px;
+.benefit-arrow {
+  margin-left: 7px;
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: 0;
   color: var(--alloy-accent);
-  opacity: 0.5;
+  opacity: 0.7;
   display: inline-block;
+  transform: translateX(0);
   transition: all 0.18s ease;
 }
-.dark .stat-arrow {
+.dark .benefit-arrow {
   color: var(--alloy-accent-bright);
 }
-.stat-item--link:hover .stat-arrow {
+.benefit--link:hover .benefit-arrow {
   opacity: 1;
   transform: translateX(2px);
 }
-.stat-num {
+.benefit-num {
   font-family: var(--alloy-font-display);
   font-size: 28px;
   font-weight: 700;
@@ -576,11 +682,11 @@ h1.hero-headline,
   line-height: 1;
   margin-bottom: 6px;
 }
-.stat-label {
+.benefit-label {
   font-family: var(--alloy-font-mono);
-  font-size: 10px;
-  color: var(--alloy-label);
-  letter-spacing: 0.1em;
+  font-size: 11.5px;
+  color: var(--alloy-muted);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -591,7 +697,7 @@ h1.hero-headline,
   .hero-grid {
     grid-template-columns: 1fr;
     gap: 36px;
-    padding: 56px 0 48px;
+    padding: 56px 24px 48px;
   }
   .hero-code {
     max-width: 420px;
@@ -601,14 +707,14 @@ h1.hero-headline,
   .alloy-features {
     grid-template-columns: 1fr;
   }
-  .alloy-stats {
+  .alloy-benefits {
     grid-template-columns: 1fr 1fr;
   }
-  .stat-item:nth-child(2) {
+  .benefit:nth-child(2) {
     border-right: none;
   }
-  .stat-item:nth-child(1),
-  .stat-item:nth-child(2) {
+  .benefit:nth-child(1),
+  .benefit:nth-child(2) {
     border-bottom: 0.5px solid var(--alloy-grid-line);
   }
 }

@@ -1,6 +1,6 @@
 # alloy-di
 
-`alloy-di` is a compile-time dependency injection toolkit for Vite. It scans your TypeScript during build, generates a static container, and ships a tiny runtime so you get dependency injection without reflection overhead.
+`alloy-di` is a build-time dependency injection toolkit for Vite. It scans your TypeScript during build, generates a static container, and ships a tiny runtime so you get dependency injection without reflection overhead.
 
 ## Highlights
 

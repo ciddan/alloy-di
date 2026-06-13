@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Alloy",
-  description: "Compile-time Dependency Injection for Vite",
+  description: "Build-time Dependency Injection for Vite",
   base: "/",
   head: [
     ["link", { rel: "icon", href: "/favicon.ico", sizes: "48x48" }],
