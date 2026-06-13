@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { DependencyDescriptor, DiscoveredMeta } from "./types";
+import type { BuildScope, DependencyDescriptor, DiscoveredMeta } from "./types";
 import type { ServiceScope } from "../../lib/scope";
 import {
   createClassKey,
@@ -14,7 +14,7 @@ interface GraphNode {
   id: string;
   label: string;
   key: string;
-  scope?: ServiceScope;
+  scope?: BuildScope;
   type: GraphNodeType;
   isLazyOnly: boolean;
   hasFactory: boolean;
@@ -33,7 +33,7 @@ interface GraphEdge {
 export interface MermaidDiagramOptions {
   direction?: "LR" | "TB" | "BT" | "RL";
   includeLegend?: boolean;
-  scopeColors?: Partial<Record<ServiceScope, string>>;
+  scopeColors?: Partial<Record<BuildScope, string>>;
   lazyNodeFill?: string;
   factoryNodeFill?: string;
   tokenNodeFill?: string;

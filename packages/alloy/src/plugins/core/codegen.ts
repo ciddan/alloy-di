@@ -7,6 +7,7 @@ import {
   createSymbolKey,
 } from "./utils";
 import type { DiscoveredMeta, DependencyDescriptor } from "./types";
+import type { AlloyScopesConfig } from "./scopes-validation";
 import { IdentifierResolver } from "./identifier-resolver";
 
 export interface ResolvedRegistration extends DiscoveredMeta {
@@ -645,6 +646,33 @@ export const __codegenInternals = {
 
 export interface GenerateContainerModuleOptions {
   isDev?: boolean;
+  /** Declared custom scope hierarchy; emitted as a runtime registration. */
+  scopes?: AlloyScopesConfig;
+}
+
+/**
+ * Builds the runtime scope-hierarchy registration statement. The generated
+ * container records the declared parent of each custom scope so child scopes
+ * constructed via `alloy-di/scopes` can be validated against the build-time
+ * hierarchy. Returns an empty string when no custom scopes are configured.
+ */
+function createScopeHierarchyBlock(
+  scopes: AlloyScopesConfig | undefined,
+): string {
+  if (!scopes) {
+    return "";
+  }
+  const names = Object.keys(scopes);
+  if (!names.length) {
+    return "";
+  }
+  const entries = names
+    .map(
+      (name) =>
+        `  ${JSON.stringify(name)}: ${JSON.stringify(scopes[name].parent)}`,
+    )
+    .join(",\n");
+  return `\ncontainer._registerScopeHierarchy({\n${entries}\n});\n`;
 }
 
 /**
@@ -685,6 +713,8 @@ export function generateContainerModule(
       ? ""
       : `\nsetEnvDetectionOverrides({ isDev: ${options.isDev} });\n`;
 
+  const scopeHierarchyBlock = createScopeHierarchyBlock(options?.scopes);
+
   let providerImportBlock = "";
   let providerInvocationBlock = "";
 
@@ -705,7 +735,7 @@ ${providerImportBlock}
 ${registrationsBlock}
 
 const container = new Container();
-
+${scopeHierarchyBlock}
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
@@ -728,10 +758,12 @@ export const GENERATED_FILE_HEADER = `/**
  *
  * @param metas - List of discovered services.
  * @param pathResolver - Function to resolve absolute file paths to import paths relative to the declaration file location.
+ * @param scopeNames - Custom scope names to register as `AlloyScopes` keys, making `@Injectable('<scope>')` type-check.
  */
 export function generateContainerTypeDefinition(
   metas: DiscoveredMeta[],
   pathResolver: (path: string) => string,
+  scopeNames: string[] = [],
 ): string {
   const resolver = new IdentifierResolver(metas);
   // The declaration module imports Container and ServiceIdentifier from the
@@ -779,6 +811,27 @@ declare module "virtual:alloy-container" {
 
   const container: Container;
   export default container;
+}
+${generateScopeAugmentation(scopeNames)}`;
+}
+
+/**
+ * Generates the module augmentation that registers custom scope names as keys
+ * of `AlloyScopes`, opening the `ServiceScope` union so `@Injectable('session')`
+ * type-checks. Returns an empty string when no custom scopes are configured.
+ */
+function generateScopeAugmentation(scopeNames: string[]): string {
+  if (!scopeNames.length) {
+    return "";
+  }
+  const members = scopeNames
+    .map((name) => `    ${JSON.stringify(name)}: true;`)
+    .join("\n");
+  return `
+declare module "alloy-di/runtime" {
+  interface AlloyScopes {
+${members}
+  }
 }
 `;
 }

@@ -5,6 +5,7 @@ import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import type { AlloyManifest } from "../core/types";
 import { normalizeImportPath, walkSync } from "../core/utils";
 import { loadVirtualContainerModule } from "../core/container-loader";
+import type { AlloyScopesConfig } from "../core/scopes-validation";
 import {
   resolveVisualizationOptions,
   type AlloyVisualizationOptions,
@@ -38,6 +39,13 @@ export interface AlloyPluginOptions {
    * `${projectRoot}/alloy-di.mmd`. Provide an object to customize output.
    */
   visualize?: boolean | AlloyVisualizationOptions;
+  /**
+   * Declares custom, application-defined scopes and their parent ordering, e.g.
+   * `{ session: { parent: 'singleton' }, request: { parent: 'session' } }`.
+   * Drives type-safe scope names (emitted into the generated declaration),
+   * runtime hierarchy registration, and build-time scope-stability validation.
+   */
+  scopes?: AlloyScopesConfig;
 }
 
 interface ProviderModuleRef {
@@ -213,6 +221,7 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           containerDeclarationDir: options.containerDeclarationDir,
           resolvedVisualization,
           isDevMode,
+          scopes: options.scopes,
         });
       },
     },

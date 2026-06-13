@@ -1,5 +1,6 @@
 import type { BuildMode } from "./build-utils";
 import type { ManifestServiceDescriptorV2 } from "../core/types";
+import type { AlloyScopesConfig } from "../core/scopes-validation";
 
 /** Manifest emitted by the rollup/rolldown plugin (schema v2). */
 export interface AlloyManifestV2 {
@@ -28,6 +29,11 @@ export interface AlloyManifestPluginOptions {
    * so consumer apps can import and apply them automatically.
    */
   providers?: string[];
+  /**
+   * Declares custom, application-defined scopes and their parent ordering. Used
+   * for build-time scope-stability validation of the library's own services.
+   */
+  scopes?: AlloyScopesConfig;
 }
 
 /**

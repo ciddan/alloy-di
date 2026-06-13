@@ -372,6 +372,48 @@ describe("codegen local name collisions (issue #17)", () => {
   });
 });
 
+describe("custom scope code generation", () => {
+  const meta = {
+    className: "Svc",
+    filePath: "/src/svc.ts",
+    metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+  };
+
+  it("emits a scope-hierarchy registration when scopes are configured", () => {
+    const code = generateContainerModule([meta], new Set(), [], {
+      scopes: {
+        session: { parent: "singleton" },
+        request: { parent: "session" },
+      },
+    });
+    expect(code).toContain("container._registerScopeHierarchy({");
+    expect(code).toContain('"session": "singleton"');
+    expect(code).toContain('"request": "session"');
+  });
+
+  it("emits no scope registration when no scopes are configured", () => {
+    const code = generateContainerModule([meta], new Set(), []);
+    expect(code).not.toContain("_registerScopeHierarchy");
+  });
+
+  it("emits the AlloyScopes augmentation in the declaration file", () => {
+    const dts = generateContainerTypeDefinition([], (p) => p, [
+      "session",
+      "request",
+    ]);
+    expect(dts).toContain('declare module "alloy-di/runtime"');
+    expect(dts).toContain("interface AlloyScopes");
+    expect(dts).toContain('"session": true;');
+    expect(dts).toContain('"request": true;');
+  });
+
+  it("omits the augmentation when there are no custom scopes", () => {
+    const dts = generateContainerTypeDefinition([], (p) => p);
+    expect(dts).not.toContain('declare module "alloy-di/runtime"');
+    expect(dts).not.toContain("AlloyScopes");
+  });
+});
+
 describe("environment override injection", () => {
   const meta = {
     className: "Svc",

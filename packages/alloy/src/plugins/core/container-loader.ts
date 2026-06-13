@@ -20,6 +20,11 @@ import {
 } from "./manifest-utils";
 import { generateMermaidDiagram } from "./visualizer";
 import {
+  validateScopeStability,
+  validateScopesConfig,
+  type AlloyScopesConfig,
+} from "./scopes-validation";
+import {
   ensureDirectoryForFile,
   type ResolvedVisualizationOptions,
 } from "./visualization-utils";
@@ -36,6 +41,8 @@ export interface LoadVirtualContainerOptions {
   resolvedVisualization: ResolvedVisualizationOptions | null;
   /** Bundler-resolved mode, injected into the generated module when known. */
   isDevMode?: boolean;
+  /** Declared custom scope hierarchy (names + parent ordering). */
+  scopes?: AlloyScopesConfig;
 }
 
 export async function loadVirtualContainerModule(
@@ -78,8 +85,17 @@ export async function loadVirtualContainerModule(
   reconcileLazySet(metas, lazyClassKeys, eagerReferencedNames);
   augmentFactoryLazyServices(metas, options.lazyServiceKeys);
 
+  // Scope-stability validation is opt-in: it runs only when custom scopes are
+  // declared. Projects without a `scopes` config keep today's behavior exactly
+  // (e.g. a singleton may freely depend on a transient).
+  if (options.scopes && Object.keys(options.scopes).length > 0) {
+    validateScopesConfig(options.scopes);
+    validateScopeStability(metas, options.scopes);
+  }
+
   const code = generateContainerModule(metas, lazyClassKeys, providerImports, {
     isDev: options.isDevMode,
+    scopes: options.scopes,
   });
 
   writeTypeDefinitions(
@@ -87,6 +103,7 @@ export async function loadVirtualContainerModule(
     loadedManifests,
     options.resolvedRoot,
     options.containerDeclarationDir,
+    options.scopes,
   );
 
   writeVisualizationArtifact(
@@ -164,10 +181,13 @@ function writeTypeDefinitions(
   loadedManifests: Awaited<ReturnType<typeof readManifests>>["loadedManifests"],
   resolvedRoot: string,
   containerDeclarationDir: string | undefined,
+  scopes: AlloyScopesConfig | undefined,
 ): void {
   const dtsDir = path.resolve(resolvedRoot, containerDeclarationDir ?? "./src");
-  const dtsContent = generateContainerTypeDefinition(metas, (filePath) =>
-    resolveDeclarationImportPath(dtsDir, filePath),
+  const dtsContent = generateContainerTypeDefinition(
+    metas,
+    (filePath) => resolveDeclarationImportPath(dtsDir, filePath),
+    scopes ? Object.keys(scopes) : [],
   );
 
   if (!fs.existsSync(dtsDir)) {

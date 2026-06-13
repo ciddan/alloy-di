@@ -133,12 +133,11 @@ export function extractServiceMetadata(
   callExpression: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ServiceMetadata {
-  let scope: ServiceScope = ServiceScope.TRANSIENT;
+  const isSingletonDecorator = decoratorName.endsWith("Singleton");
+  let scope: string = isSingletonDecorator
+    ? ServiceScope.SINGLETON
+    : ServiceScope.TRANSIENT;
   let dependencies: DependencyDescriptor[] = [];
-
-  if (decoratorName.endsWith("Singleton")) {
-    scope = ServiceScope.SINGLETON;
-  }
 
   const args = callExpression.arguments;
   if (args.length === 0) {
@@ -151,47 +150,43 @@ export function extractServiceMetadata(
     for (const prop of firstArg.properties) {
       if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
         if (prop.name.text === "scope") {
-          if (ts.isStringLiteral(prop.initializer)) {
-            const val = prop.initializer.text;
-            if (val === "singleton") {
-              scope = ServiceScope.SINGLETON;
-            } else if (val === "transient") {
-              scope = ServiceScope.TRANSIENT;
-            }
+          // Any string literal is preserved verbatim as a (possibly custom)
+          // scope name; the plugin validates it against the `scopes` config.
+          if (ts.isStringLiteralLike(prop.initializer)) {
+            scope = prop.initializer.text;
           }
         } else if (prop.name.text === "dependencies") {
           dependencies = parseDependencies(prop.initializer, sourceFile);
         }
       }
     }
-    // Override scope if Singleton decorator was used
-    if (decoratorName.endsWith("Singleton")) {
-      scope = ServiceScope.SINGLETON;
-    }
-    return { scope, dependencies };
-  }
-
-  let depsNode: ts.Node | undefined;
-
-  if (ts.isStringLiteralLike(firstArg)) {
-    if (firstArg.text === "singleton") {
-      scope = ServiceScope.SINGLETON;
-    }
   } else {
-    depsNode = firstArg;
-  }
+    let depsNode: ts.Node | undefined;
 
-  if (args.length > 1) {
-    const secondArg = args[1];
-    if (ts.isStringLiteralLike(secondArg)) {
-      if (secondArg.text === "singleton") {
-        scope = ServiceScope.SINGLETON;
+    // First positional arg is either a scope string or a dependency list.
+    if (ts.isStringLiteralLike(firstArg)) {
+      scope = firstArg.text;
+    } else {
+      depsNode = firstArg;
+    }
+
+    // Second positional arg, when present, is always the scope string.
+    if (args.length > 1) {
+      const secondArg = args[1];
+      if (ts.isStringLiteralLike(secondArg)) {
+        scope = secondArg.text;
       }
     }
+
+    if (depsNode) {
+      dependencies = parseDependencies(depsNode, sourceFile);
+    }
   }
 
-  if (depsNode) {
-    dependencies = parseDependencies(depsNode, sourceFile);
+  // The `@Singleton` decorator always pins the singleton scope regardless of
+  // any scope string supplied in its arguments.
+  if (isSingletonDecorator) {
+    scope = ServiceScope.SINGLETON;
   }
 
   return { scope, dependencies };
