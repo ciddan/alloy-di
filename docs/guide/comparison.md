@@ -109,7 +109,7 @@ That single choice drives most of Alloy's advantages and most of its gaps.
 ## Positioning
 
 Alloy occupies a niche few others target well: **DI for bundle-size-sensitive
-frontend apps that want compile-time safety and code-splitting built into the
+frontend apps that want build-time safety and code-splitting built into the
 dependency graph.** In that niche its advantages — build-time validation,
 bundler-native lazy loading, no reflect-metadata, tiny runtime — are
 differentiated and hard to replicate with a runtime container.

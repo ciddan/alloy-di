@@ -1,6 +1,6 @@
 # What is Alloy?
 
-Alloy is a Vite plugin for **compile-time dependency injection**.
+Alloy is a Vite plugin for **build-time dependency injection**.
 
 It scans your code at build time to build a dependency graph and generates a DI container, which is then available to your application as a virtual module. This approach minimizes runtime overhead, avoids `reflect-metadata`, and provides a clean, declarative API for managing your services.
 

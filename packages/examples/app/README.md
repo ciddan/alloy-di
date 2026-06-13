@@ -4,7 +4,7 @@ A React + Vite application demonstrating all major features of the Alloy depende
 
 ## Overview
 
-This example app showcases real-world usage of Alloy's compile-time DI system in a React application, including:
+This example app showcases real-world usage of Alloy's build-time DI system in a React application, including:
 
 - Service declaration with decorators
 - Singleton and transient lifecycle scopes
@@ -271,7 +271,7 @@ export default defineConfig({
 
 ## Key Takeaways
 
-1. **Compile-time DI**: No runtime reflection or metadata overhead
+1. **Build-time DI**: No runtime reflection or metadata overhead
 2. **Type-safe**: Full TypeScript support with intellisense
 3. **Code-splitting ready**: Multiple lazy loading strategies
 4. **Flexible integration**: Works with both internal (manifest) and external (provider) libraries

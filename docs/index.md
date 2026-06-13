@@ -1,6 +1,6 @@
 ---
 layout: page
-title: Alloy — Compile-time Dependency Injection for Vite
+title: Alloy — Build-time Dependency Injection for Vite
 pageClass: alloy-landing
 ---
 

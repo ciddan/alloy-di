@@ -43,9 +43,15 @@ const gedges: [number, number][] = [
 const features = [
   {
     tag: "Build-time",
-    title: "Compile-time resolution",
-    desc: "Scans your source at build time to emit a static dependency graph. Zero reflection, zero runtime overhead.",
+    title: "Static resolution",
+    desc: "Alloy scans your source at build time to emit a static dependency graph — no reflection, minimal runtime.",
     icon: "cpu",
+  },
+  {
+    tag: "Safety",
+    title: "Errors caught at build time",
+    desc: "Circular dependencies and duplicate registrations fail the build — not a request in production.",
+    icon: "check",
   },
   {
     tag: "Code-split",
@@ -54,16 +60,22 @@ const features = [
     icon: "layers",
   },
   {
+    tag: "Safety",
+    title: "Fully type-safe",
+    desc: "Generates TypeScript definitions for every service identifier. Your IDE knows the whole graph.",
+    icon: "shield",
+  },
+  {
+    tag: null,
+    title: "Visualized graph",
+    desc: "Because the whole graph is known ahead of time, Alloy emits a Mermaid diagram of your services.",
+    icon: "graph",
+  },
+  {
     tag: null,
     title: "Framework agnostic",
     desc: "Works with React, Vue, Svelte, or vanilla TypeScript. It's just a Vite plugin.",
     icon: "puzzle",
-  },
-  {
-    tag: null,
-    title: "Fully type-safe",
-    desc: "Generates TypeScript definitions for all service identifiers. Your IDE knows the full graph.",
-    icon: "shield",
   },
 ];
 
@@ -119,12 +131,12 @@ const benefits = [
             <span class="hero-eyebrow-dot" />
             Vite Plugin · DI Framework
           </div>
-          <h1 class="hero-headline">Compile-time</h1>
+          <h1 class="hero-headline">Build-time</h1>
           <h1 class="hero-headline hero-headline--accent">
             Dependency Injection.
           </h1>
           <p class="hero-desc">
-            Build time safety. Zero runtime reflection. Alloy resolves your
+            Build-time safety, zero runtime reflection. Alloy resolves your
             dependency graph at build time — generating a static, type-safe
             container that ships nothing it doesn't use.
           </p>
@@ -217,6 +229,16 @@ const benefits = [
               <path
                 d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
               />
+            </template>
+            <template v-else-if="f.icon === 'check'">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8.5 12l2.5 2.5l4.5 -5" />
+            </template>
+            <template v-else-if="f.icon === 'graph'">
+              <circle cx="6" cy="6" r="2.5" />
+              <circle cx="6" cy="18" r="2.5" />
+              <circle cx="18" cy="12" r="2.5" />
+              <path d="M8.2 7.2l7.6 3.6M8.2 16.8l7.6 -3.6" />
             </template>
             <template v-else>
               <path
