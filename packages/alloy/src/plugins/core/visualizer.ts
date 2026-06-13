@@ -2,11 +2,20 @@ import path from "node:path";
 import type { BuildScope, DependencyDescriptor, DiscoveredMeta } from "./types";
 import type { ServiceScope } from "../../lib/scope";
 import {
+  isDependencyAllowed,
+  type AlloyScopesConfig,
+} from "./scopes-validation";
+import {
   createClassKey,
   createSymbolKey,
   hashString,
   normalizeImportPath,
 } from "./utils";
+
+/** Stroke color applied to edges that violate scope stability. */
+const VIOLATION_EDGE_COLOR = "#ff4d4f";
+/** Suffix appended to a violating edge's label. */
+const VIOLATION_LABEL_SUFFIX = " ⚠️";
 
 type GraphNodeType = "service" | "token";
 
@@ -28,6 +37,7 @@ interface GraphEdge {
   label: string;
   isLazy: boolean;
   stroke: string;
+  isViolation: boolean;
 }
 
 export interface MermaidDiagramOptions {
@@ -48,6 +58,11 @@ export interface MermaidDiagramInput {
   metas: DiscoveredMeta[];
   lazyClassKeys?: Set<string>;
   options?: MermaidDiagramOptions;
+  /**
+   * Declared custom scope hierarchy. When provided, service nodes are grouped
+   * into per-scope subgraphs and scope-stability violations are highlighted.
+   */
+  scopes?: AlloyScopesConfig;
 }
 
 export interface MermaidDiagramArtifact {
@@ -61,6 +76,20 @@ const DEFAULT_SCOPE_COLORS: Partial<Record<ServiceScope, string>> = {
   singleton: "#3b6ea5",
   transient: "#2a7d73",
 };
+
+/**
+ * Fill colors assigned to custom scopes by declared order when no explicit
+ * `scopeColors` entry is supplied. Chosen to read on the dark canvas and stay
+ * distinct from the built-in scope, lazy, factory, and token fills.
+ */
+const CUSTOM_SCOPE_PALETTE: string[] = [
+  "#a4548c", // rose
+  "#5e8c4f", // moss
+  "#c08a2e", // amber
+  "#8a6bd6", // violet
+  "#3f8f9b", // cyan
+  "#b5587a", // pink
+];
 
 const DEFAULT_OPTIONS: Required<
   Pick<
@@ -109,6 +138,7 @@ export function generateMermaidDiagram({
   metas,
   lazyClassKeys,
   options,
+  scopes,
 }: MermaidDiagramInput): MermaidDiagramArtifact {
   const mergedOptions: typeof DEFAULT_OPTIONS = {
     ...DEFAULT_OPTIONS,
@@ -118,6 +148,23 @@ export function generateMermaidDiagram({
       ...options?.scopeColors,
     },
   };
+
+  // Stability highlighting and scope grouping are active only when a custom
+  // hierarchy is declared, mirroring the build-time validation gate.
+  const scopesConfig =
+    scopes && Object.keys(scopes).length > 0 ? scopes : undefined;
+
+  // Custom scopes declared longest-lived first. Each without an explicit color
+  // gets a stable default from the palette so its subgraph and nodes are
+  // visually distinct.
+  const customScopeNames = scopesConfig ? Object.keys(scopesConfig) : [];
+  customScopeNames.forEach((name, idx) => {
+    if (mergedOptions.scopeColors[name] === undefined) {
+      mergedOptions.scopeColors[name] =
+        CUSTOM_SCOPE_PALETTE[idx % CUSTOM_SCOPE_PALETTE.length];
+    }
+  });
+  const customScopes = new Set(customScopeNames);
 
   const lazyKeys = lazyClassKeys ?? new Set<string>();
   const serviceNodes: GraphNode[] = [];
@@ -199,12 +246,24 @@ export function generateMermaidDiagram({
         }
         edgeKeys.add(edgeKey);
 
+        const isViolation = isStabilityViolation(
+          sourceNode,
+          target,
+          scopesConfig,
+        );
+        const label = isViolation
+          ? `${describeEdge(sourceNode, target)}${VIOLATION_LABEL_SUFFIX}`
+          : describeEdge(sourceNode, target);
+
         edges.push({
           from: sourceNode,
           to: target,
-          label: describeEdge(sourceNode, target),
+          label,
           isLazy: dep.isLazy,
-          stroke: selectEdgeColor(dep.isLazy, target, mergedOptions),
+          stroke: isViolation
+            ? VIOLATION_EDGE_COLOR
+            : selectEdgeColor(dep.isLazy, target, mergedOptions),
+          isViolation,
         });
       }
     }
@@ -222,6 +281,15 @@ export function generateMermaidDiagram({
     lines.push(
       `  %% Edge labels: Si=singleton, Tr=transient, Tk=token; solid=eager, dotted=lazy`,
     );
+    if (scopesConfig) {
+      const scopeLegend = customScopeNames
+        .map((name) => `${name}=${mergedOptions.scopeColors[name]}`)
+        .join(", ");
+      lines.push(`  %% Custom scopes: ${scopeLegend}`);
+      lines.push(
+        `  %% Scope stability: ⚠️ ${VIOLATION_EDGE_COLOR} edge = captive dependency (longer-lived service depends on shorter-lived scope)`,
+      );
+    }
   }
 
   const allNodes: GraphNode[] = [
@@ -229,10 +297,40 @@ export function generateMermaidDiagram({
     ...Array.from(tokenNodes.values()),
   ];
 
+  // Declare nodes, grouping custom-scoped services into per-scope subgraphs so
+  // the lifecycle lattice is visible at a glance. Built-in scopes and tokens
+  // stay at the top level.
+  const groupedNodes = new Map<string, GraphNode[]>();
+  const ungroupedNodes: GraphNode[] = [];
   for (const node of allNodes) {
-    const safeLabel = escapeMermaidLabel(node.label);
-    lines.push(`  ${node.id}["${safeLabel}"]`);
+    if (node.type === "service" && node.scope && customScopes.has(node.scope)) {
+      const bucket = groupedNodes.get(node.scope) ?? [];
+      bucket.push(node);
+      groupedNodes.set(node.scope, bucket);
+    } else {
+      ungroupedNodes.push(node);
+    }
+  }
 
+  customScopeNames.forEach((scopeName, idx) => {
+    const grouped = groupedNodes.get(scopeName);
+    if (!grouped?.length) {
+      return;
+    }
+    const subgraphId = sanitizeMermaidId(`scope_${scopeName}`, idx);
+    lines.push(`  subgraph ${subgraphId}["${escapeMermaidLabel(scopeName)}"]`);
+    for (const node of grouped) {
+      lines.push(`    ${node.id}["${escapeMermaidLabel(node.label)}"]`);
+    }
+    lines.push("  end");
+  });
+
+  for (const node of ungroupedNodes) {
+    lines.push(`  ${node.id}["${escapeMermaidLabel(node.label)}"]`);
+  }
+
+  // Node styles are valid outside subgraph blocks, so emit them together.
+  for (const node of allNodes) {
     const styleParts = [
       nodeFill(node, mergedOptions),
       `stroke:${mergedOptions.nodeStrokeColor}`,
@@ -294,12 +392,45 @@ function escapeMermaidLabel(label: string): string {
   return label.replaceAll('"', '\\"').replaceAll("|", "/");
 }
 
-/** Single-token code for a node's scope/kind: Si, Tr, or Tk (token). */
+/**
+ * Compact code for a node's scope/kind: `Tk` (token), `Si` (singleton), `Tr`
+ * (transient), or a Title-cased two-letter code for a custom scope (e.g.
+ * `session` -> `Se`).
+ */
 function scopeCode(node: GraphNode): string {
   if (node.type === "token") {
     return "Tk";
   }
-  return node.scope === "transient" ? "Tr" : "Si";
+  const scope = node.scope;
+  if (!scope || scope === "singleton") {
+    return "Si";
+  }
+  if (scope === "transient") {
+    return "Tr";
+  }
+  return scope.charAt(0).toUpperCase() + scope.charAt(1).toLowerCase();
+}
+
+/**
+ * True when an edge captures a shorter-lived dependency in a longer-lived host,
+ * per the declared hierarchy. Only service-to-service edges with known scopes
+ * are considered, and only when a custom hierarchy is configured.
+ */
+function isStabilityViolation(
+  from: GraphNode,
+  to: GraphNode,
+  scopes: AlloyScopesConfig | undefined,
+): boolean {
+  if (!scopes) {
+    return false;
+  }
+  if (from.type !== "service" || to.type !== "service") {
+    return false;
+  }
+  if (!from.scope || !to.scope) {
+    return false;
+  }
+  return !isDependencyAllowed(from.scope, to.scope, scopes);
 }
 
 /**

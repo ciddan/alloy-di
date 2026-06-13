@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateMermaidDiagram } from "./visualizer";
-import type { DependencyDescriptor, DiscoveredMeta } from "./types";
-import type { ServiceScope } from "../../lib/scope";
+import type { BuildScope, DependencyDescriptor, DiscoveredMeta } from "./types";
 import { createClassKey } from "./utils";
 
 type ReferencedImport = NonNullable<
@@ -33,7 +32,7 @@ function createMeta({
 }: {
   className: string;
   filePath: string;
-  scope: ServiceScope;
+  scope: BuildScope;
   dependencies?: DependencyDescriptor[];
   referencedImports?: ReferencedImport[];
   identifierKey?: string;
@@ -280,6 +279,129 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.diagram).toContain(
       "id_AbsoluteConsumer -->|Tr→Si| id_Absolute",
     );
+  });
+
+  describe("custom scopes", () => {
+    const SCOPES = {
+      session: { parent: "singleton" },
+      request: { parent: "session" },
+    };
+
+    it("groups custom-scoped services into per-scope subgraphs", () => {
+      const sessionSvc = createMeta({
+        className: "UserSession",
+        filePath: "/src/user-session.ts",
+        scope: "session",
+        identifierKey: "id_UserSession",
+      });
+      const requestSvc = createMeta({
+        className: "RequestLogger",
+        filePath: "/src/request-logger.ts",
+        scope: "request",
+        identifierKey: "id_RequestLogger",
+      });
+      const rootSvc = createMeta({
+        className: "Config",
+        filePath: "/src/config.ts",
+        scope: "singleton",
+        identifierKey: "id_Config",
+      });
+
+      const artifact = generateMermaidDiagram({
+        metas: [sessionSvc, requestSvc, rootSvc],
+        scopes: SCOPES,
+      });
+
+      expect(artifact.diagram).toContain('subgraph scope_session["session"]');
+      expect(artifact.diagram).toContain('subgraph scope_request["request"]');
+      // singleton service stays at the top level, not inside a subgraph
+      expect(artifact.diagram).toContain('id_Config["Config"]');
+      expect(artifact.diagram).toMatch(
+        /subgraph scope_session[^]*id_UserSession/,
+      );
+      // custom scopes get distinct default fills (first two palette entries)
+      expect(artifact.diagram).toContain("style id_UserSession fill:#a4548c");
+      expect(artifact.diagram).toContain("style id_RequestLogger fill:#5e8c4f");
+      expect(artifact.diagram).toContain("%% Custom scopes: session=#a4548c");
+    });
+
+    it("respects explicit scopeColors overrides for custom scopes", () => {
+      const sessionSvc = createMeta({
+        className: "UserSession",
+        filePath: "/src/user-session.ts",
+        scope: "session",
+        identifierKey: "id_UserSession",
+      });
+
+      const artifact = generateMermaidDiagram({
+        metas: [sessionSvc],
+        scopes: SCOPES,
+        options: { scopeColors: { session: "#123456" } },
+      });
+
+      expect(artifact.diagram).toContain("style id_UserSession fill:#123456");
+    });
+
+    it("highlights scope-stability violations with color and a warning label", () => {
+      const requestSvc = createMeta({
+        className: "RequestLogger",
+        filePath: "/src/request-logger.ts",
+        scope: "request",
+        identifierKey: "id_RequestLogger",
+      });
+      const captiveSingleton = createMeta({
+        className: "AppService",
+        filePath: "/src/app-service.ts",
+        scope: "singleton",
+        identifierKey: "id_AppService",
+        dependencies: [dep("RequestLogger", ["RequestLogger"])],
+        referencedImports: [
+          {
+            name: "RequestLogger",
+            path: "./request-logger",
+            originalName: "RequestLogger",
+          },
+        ],
+      });
+
+      const artifact = generateMermaidDiagram({
+        metas: [captiveSingleton, requestSvc],
+        scopes: SCOPES,
+      });
+
+      expect(artifact.diagram).toContain("⚠️");
+      expect(artifact.diagram).toMatch(
+        /id_AppService -->\|Si→Re ⚠️\| id_RequestLogger/,
+      );
+      // The violating edge is colored red.
+      expect(artifact.diagram).toContain("stroke:#ff4d4f");
+    });
+
+    it("does not flag singleton->transient when no scopes are configured", () => {
+      const transientSvc = createMeta({
+        className: "Helper",
+        filePath: "/src/helper.ts",
+        scope: "transient",
+        identifierKey: "id_Helper",
+      });
+      const singletonSvc = createMeta({
+        className: "AppService",
+        filePath: "/src/app-service.ts",
+        scope: "singleton",
+        identifierKey: "id_AppService",
+        dependencies: [dep("Helper", ["Helper"])],
+        referencedImports: [
+          { name: "Helper", path: "./helper", originalName: "Helper" },
+        ],
+      });
+
+      const artifact = generateMermaidDiagram({
+        metas: [singletonSvc, transientSvc],
+      });
+
+      expect(artifact.diagram).not.toContain("⚠️");
+      expect(artifact.diagram).not.toContain("stroke:#ff4d4f");
+    });
   });
 
   it("applies custom diagram options", () => {

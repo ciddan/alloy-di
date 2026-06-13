@@ -110,6 +110,7 @@ export async function loadVirtualContainerModule(
     metas,
     lazyClassKeys,
     options.resolvedVisualization,
+    options.scopes,
   );
 
   return { code, moduleType: "js" };
@@ -230,6 +231,7 @@ function writeVisualizationArtifact(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
   resolvedVisualization: ResolvedVisualizationOptions | null,
+  scopes: AlloyScopesConfig | undefined,
 ): void {
   if (!resolvedVisualization) {
     return;
@@ -239,6 +241,7 @@ function writeVisualizationArtifact(
     metas,
     lazyClassKeys: new Set(lazyReferencedClassKeys),
     options: resolvedVisualization.mermaidOptions,
+    scopes,
   });
   ensureDirectoryForFile(resolvedVisualization.outputPath);
   writeFileIfChanged(
