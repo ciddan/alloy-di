@@ -21,7 +21,7 @@ export default defineConfig(async () => {
         manifests: [manifest],
         lazyServices: [ReportingServiceIdentifier],
         scopes: {
-          session: { parent: "singleton" },
+          session: {}, // parent defaults to "singleton"
           request: { parent: "session" },
         },
         visualize: {

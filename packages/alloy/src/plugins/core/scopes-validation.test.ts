@@ -47,6 +47,12 @@ describe("validateScopesConfig", () => {
     expect(() => validateScopesConfig(HIERARCHY)).not.toThrow();
   });
 
+  it("treats an omitted parent as 'singleton'", () => {
+    expect(() =>
+      validateScopesConfig({ session: {}, request: { parent: "session" } }),
+    ).not.toThrow();
+  });
+
   it("rejects redeclaring a built-in lifecycle", () => {
     expect(() =>
       validateScopesConfig({ singleton: { parent: "singleton" } }),
@@ -96,6 +102,15 @@ describe("getAncestorScopes", () => {
       "singleton",
     ]);
     expect(getAncestorScopes("session", HIERARCHY)).toEqual(["singleton"]);
+  });
+
+  it("defaults an omitted parent to 'singleton' and still reaches the root", () => {
+    const config = { session: {}, request: { parent: "session" } };
+    expect(getAncestorScopes("session", config)).toEqual(["singleton"]);
+    expect(getAncestorScopes("request", config)).toEqual([
+      "session",
+      "singleton",
+    ]);
   });
 });
 

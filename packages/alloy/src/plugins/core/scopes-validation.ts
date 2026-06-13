@@ -5,6 +5,14 @@ import { normalizeImportPath } from "./utils";
 const SINGLETON = "singleton";
 const TRANSIENT = "transient";
 
+/**
+ * Resolves a declared scope's parent, defaulting to the implicit `singleton`
+ * root when omitted.
+ */
+function parentOf(config: AlloyScopesConfig, name: string): string {
+  return config[name]?.parent ?? SINGLETON;
+}
+
 /** Identifiers that never refer to a discoverable service in a dependency expression. */
 const RESERVED_IDENTIFIERS = new Set([
   "Lazy",
@@ -17,8 +25,11 @@ const RESERVED_IDENTIFIERS = new Set([
 
 /** Declared parent relationship for a single custom scope. */
 export interface AlloyScopeConfig {
-  /** The next-longer-lived scope. Either `"singleton"` or another custom scope. */
-  parent: string;
+  /**
+   * The next-longer-lived scope: either `"singleton"` or another custom scope.
+   * Defaults to `"singleton"` when omitted.
+   */
+  parent?: string;
 }
 
 /**
@@ -60,7 +71,7 @@ export function validateScopesConfig(
   }
 
   for (const name of names) {
-    const declaredParent: string = config[name].parent;
+    const declaredParent = parentOf(config, name);
     if (declaredParent === TRANSIENT) {
       errors.push(
         `- '${name}' declares 'transient' as its parent, but 'transient' is the implicit leaf and can never be a parent.`,
@@ -85,7 +96,7 @@ export function validateScopesConfig(
         break;
       }
       seen.add(current);
-      current = config[current]?.parent;
+      current = current in config ? parentOf(config, current) : undefined;
     }
   }
 
@@ -115,7 +126,7 @@ export function getAncestorScopes(
   }
 
   const ancestors: string[] = [];
-  let current: string | undefined = config[scope].parent;
+  let current: string | undefined = parentOf(config, scope);
   const guard = new Set<string>();
   while (current) {
     if (guard.has(current)) {
@@ -126,7 +137,7 @@ export function getAncestorScopes(
     if (current === SINGLETON) {
       break;
     }
-    current = config[current]?.parent;
+    current = parentOf(config, current);
   }
   return ancestors;
 }

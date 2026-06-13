@@ -669,7 +669,7 @@ function createScopeHierarchyBlock(
   const entries = names
     .map(
       (name) =>
-        `  ${JSON.stringify(name)}: ${JSON.stringify(scopes[name].parent)}`,
+        `  ${JSON.stringify(name)}: ${JSON.stringify(scopes[name].parent ?? "singleton")}`,
     )
     .join(",\n");
   return `\ncontainer._registerScopeHierarchy({\n${entries}\n});\n`;

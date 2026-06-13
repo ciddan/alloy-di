@@ -28,7 +28,10 @@ function AppContent() {
 
   // Scopes Demo State
   const sessionScopeRef = useRef<Scope | null>(null);
-  const [sessionInfo, setSessionInfo] = useState<{ username: string; createdAt: string } | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<{
+    username: string;
+    createdAt: string;
+  } | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
   const addLog = (msg: string) => {
@@ -76,12 +79,18 @@ function AppContent() {
     const requestScope = sessionScopeRef.current.createScope("request");
 
     try {
-      addLog("Resolving RequestLogger from request scope (bubbles up to resolve SessionUser from parent)...");
+      addLog(
+        "Resolving RequestLogger from request scope (bubbles up to resolve SessionUser from parent)...",
+      );
       const logger = await requestScope.get(RequestLogger);
 
       logger.log("Handling API request to /api/dashboard");
-      addLog(`[Request Context] Logger initialized with ID: ${logger.requestId}`);
-      addLog(`[Request Context] Injected SessionUser: ${sessionInfo?.username}`);
+      addLog(
+        `[Request Context] Logger initialized with ID: ${logger.requestId}`,
+      );
+      addLog(
+        `[Request Context] Injected SessionUser: ${sessionInfo?.username}`,
+      );
 
       logger.log("Request successfully processed.");
     } finally {
@@ -96,7 +105,7 @@ function AppContent() {
     return () => {
       analyticsConsumer.shutdown();
       if (sessionScopeRef.current) {
-        sessionScopeRef.current.dispose();
+        void sessionScopeRef.current.dispose();
       }
     };
   }, [analyticsConsumer]);
@@ -139,29 +148,40 @@ function AppContent() {
 
       {/* Hierarchical Scopes Demo */}
       <div className={styles.demoSection}>
-        <h2 className={styles.demoTitle}>Hierarchical Scopes (Custom Lifecycles) Demo</h2>
+        <h2 className={styles.demoTitle}>
+          Hierarchical Scopes (Custom Lifecycles) Demo
+        </h2>
         <p style={{ color: "#a0a0b8", marginBottom: "1.5rem" }}>
-          Demonstrates runtime parent-child scope creation, resolution bubbling, and ordered disposal lifecycle.
+          Demonstrates runtime parent-child scope creation, resolution bubbling,
+          and ordered disposal lifecycle.
         </p>
 
         <div className={styles.demoCard}>
           <div>
             <span className={styles.statusLabel}>Session Status:</span>
             {sessionInfo ? (
-              <span style={{ color: "#00ff66", fontWeight: "bold" }}>Active</span>
+              <span style={{ color: "#00ff66", fontWeight: "bold" }}>
+                Active
+              </span>
             ) : (
-              <span style={{ color: "#ff3366", fontWeight: "bold" }}>Inactive</span>
+              <span style={{ color: "#ff3366", fontWeight: "bold" }}>
+                Inactive
+              </span>
             )}
           </div>
           {sessionInfo && (
             <div style={{ marginTop: "0.5rem" }}>
               <div>
                 <span className={styles.statusLabel}>Session User:</span>
-                <span className={styles.statusValue}>{sessionInfo.username}</span>
+                <span className={styles.statusValue}>
+                  {sessionInfo.username}
+                </span>
               </div>
               <div style={{ marginTop: "0.25rem" }}>
                 <span className={styles.statusLabel}>Created At:</span>
-                <span className={styles.statusValue}>{sessionInfo.createdAt}</span>
+                <span className={styles.statusValue}>
+                  {sessionInfo.createdAt}
+                </span>
               </div>
             </div>
           )}
@@ -193,7 +213,9 @@ function AppContent() {
           <span className={styles.statusLabel}>Scope Lifecycle Event Log:</span>
           <div className={styles.logsContainer}>
             {logs.length === 0 ? (
-              <div style={{ color: "#666" }}>No events logged yet. Click buttons above to start.</div>
+              <div style={{ color: "#666" }}>
+                No events logged yet. Click buttons above to start.
+              </div>
             ) : (
               logs.map((log, index) => (
                 <div key={index} className={styles.logEntry}>
@@ -205,7 +227,9 @@ function AppContent() {
         </div>
       </div>
 
-      <p className={styles.readTheDocs} style={{ marginTop: "2rem" }}>DI powered by alloy-di</p>
+      <p className={styles.readTheDocs} style={{ marginTop: "2rem" }}>
+        DI powered by alloy-di
+      </p>
     </div>
   );
 }
