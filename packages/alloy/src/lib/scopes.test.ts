@@ -99,6 +99,13 @@ describe("Hierarchical Scopes Runtime", () => {
       expect(request.scopeName).toBe("request");
     });
 
+    it("allows creating valid scopes using the Scope.createScope member method", () => {
+      const session = createScope(container, s("session"));
+      const request = session.createScope(s("request"));
+      expect(request).toBeInstanceOf(Scope);
+      expect(request.scopeName).toBe("request");
+    });
+
     it("throws an error on parent scope mismatch (drift protection)", () => {
       expect(() => createScope(container, s("request"))).toThrow(
         /Invalid scope hierarchy construction: scope 'request' is declared with parent 'session', but was constructed with parent scope 'singleton'/,
@@ -170,6 +177,13 @@ describe("Hierarchical Scopes Runtime", () => {
 
       expect(svc1).not.toBe(svc2);
       expect(svc1.request).toBe(svc2.request);
+    });
+
+    it("degrades safely to transient behavior when resolved directly from the Container without an active custom scope", async () => {
+      const s1 = await container.get(SessionService);
+      const s2 = await container.get(SessionService);
+      expect(s1).toBeInstanceOf(SessionService);
+      expect(s1).not.toBe(s2);
     });
   });
 
@@ -398,6 +412,57 @@ describe("Hierarchical Scopes Runtime", () => {
 
       await expect(session.dispose()).rejects.toThrow(AggregateError);
       expect(disposalLogs).toEqual(["T2:dispose", "T1:dispose"]);
+    });
+
+    it("aggregates errors thrown by child scopes during disposal", async () => {
+      const session = createScope(container, s("session"));
+      const request = createScope(session, s("request"));
+
+      @Injectable(s("request"))
+      class Thrower extends ThrowingDisposerService {
+        constructor() {
+          super("ChildThrower");
+        }
+      }
+
+      await request.get(Thrower);
+      await expect(session.dispose()).rejects.toThrow(/ChildThrower failed/);
+    });
+
+    it("ignores services without disposal hooks during disposal", async () => {
+      const session = createScope(container, s("session"));
+
+      @Injectable(s("session"))
+      class NonDisposable {}
+
+      await session.get(NonDisposable);
+      await expect(session.dispose()).resolves.not.toThrow();
+    });
+
+    it("ignores primitive or null instances in cached collection during disposal", async () => {
+      const session = createScope(container, s("session"));
+      session.setCached(class {}, null);
+      session.setCached(class {}, "string");
+      await expect(session.dispose()).resolves.not.toThrow();
+    });
+
+    it("respects lifecycle hook priority and avoids duplicate disposer execution", async () => {
+      const session = createScope(container, s("session"));
+
+      @Injectable(s("session"))
+      class MultiDisposal {
+        public [Symbol.dispose](): void {
+          disposalLogs.push("dispose");
+        }
+        public alloyOnDestroy(): void {
+          disposalLogs.push("alloyOnDestroy");
+        }
+      }
+
+      await session.get(MultiDisposal);
+      await session.dispose();
+
+      expect(disposalLogs).toEqual(["dispose"]);
     });
   });
 });

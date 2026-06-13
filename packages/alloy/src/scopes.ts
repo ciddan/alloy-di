@@ -64,20 +64,14 @@ export class Scope implements ResolutionContext {
     if (this.valueProviders.has(tokenId)) {
       return this.valueProviders.get(tokenId);
     }
-    if (this.parent) {
-      return this.parent.getProvider(tokenId);
-    }
-    return undefined;
+    return this.parent.getProvider(tokenId);
   }
 
   public hasProvider(tokenId: symbol): boolean {
     if (this.valueProviders.has(tokenId)) {
       return true;
     }
-    if (this.parent) {
-      return this.parent.hasProvider(tokenId);
-    }
-    return false;
+    return this.parent.hasProvider(tokenId);
   }
 
   // --- Public Container-like Interface ---
