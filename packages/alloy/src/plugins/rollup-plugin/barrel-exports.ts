@@ -7,6 +7,26 @@ function hasExportModifier(node: ts.Node): boolean {
 }
 
 /**
+ * Collect every bound identifier from a variable declaration name, handling
+ * destructuring exports (`export const { Foo, Bar } = …`, `export const [a] = …`)
+ * in addition to plain identifiers. Recurses into nested patterns; for renamed
+ * bindings (`{ Foo: Renamed }`) the bound local name (`Renamed`) is collected.
+ */
+function collectBindingNames(name: ts.BindingName, out: Set<string>): void {
+  if (ts.isIdentifier(name)) {
+    out.add(name.text);
+    return;
+  }
+  // ObjectBindingPattern | ArrayBindingPattern
+  for (const element of name.elements) {
+    if (ts.isBindingElement(element)) {
+      collectBindingNames(element.name, out);
+    }
+    // ArrayBindingPattern holes are OmittedExpression — nothing to bind.
+  }
+}
+
+/**
  * Parses the barrel export file (index.ts) to extract all publicly exported symbol names.
  * Used in bundled/chunks modes to detect services that aren't properly exported.
  *
@@ -51,12 +71,10 @@ export function parseExportedNames(
       names.add(node.name.text);
     }
 
-    // export const bar = ...
+    // export const bar = ... (incl. destructuring: export const { Foo } = ...)
     if (ts.isVariableStatement(node) && hasExportModifier(node)) {
       for (const decl of node.declarationList.declarations) {
-        if (ts.isIdentifier(decl.name)) {
-          names.add(decl.name.text);
-        }
+        collectBindingNames(decl.name, names);
       }
     }
 

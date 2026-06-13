@@ -24,6 +24,22 @@ describe("parseExportedNames", () => {
     );
   });
 
+  it("captures destructuring exports (object, array, rename, rest)", () => {
+    const sources = new Map<string, string>([
+      [
+        "/proj/src/index.ts",
+        `
+          export const { Foo, Bar: Renamed } = make();
+          export const [first, , third] = tuple();
+          export const { nested: { deep }, ...rest } = make();
+        `,
+      ],
+    ]);
+    expect([...parseExportedNames(sources)].toSorted()).toEqual(
+      ["Foo", "Renamed", "deep", "first", "rest", "third"].toSorted(),
+    );
+  });
+
   it("returns empty when there is no barrel index", () => {
     const sources = new Map([["/proj/src/foo.ts", "export class Foo {}"]]);
     expect(parseExportedNames(sources).size).toBe(0);
