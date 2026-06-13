@@ -781,10 +781,10 @@ export function generateContainerTypeDefinition(
 
     // If the class name matches the import name, we can use a simple import
     if (importName === meta.className) {
-      imports.push(`import { ${meta.className} } from '${importPath}';`);
+      imports.push(`  import { ${meta.className} } from '${importPath}';`);
     } else {
       imports.push(
-        `import { ${meta.className} as ${importName} } from '${importPath}';`,
+        `  import { ${meta.className} as ${importName} } from '${importPath}';`,
       );
     }
 
@@ -839,8 +839,6 @@ declare module "alloy-di/runtime" {
 ${members}
   }
 }
-
-export {};
 `;
 }
 
