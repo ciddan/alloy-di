@@ -40,39 +40,48 @@ const gedges: [number, number][] = [
   [2, 8],
 ];
 
+// A feature's category owns both its eyebrow label and its accent hue, so the
+// colour always maps to meaning (and is defined in exactly one place).
+const categories = {
+  buildtime: { label: "Build-time", color: "blue" },
+  safety: { label: "Safety", color: "teal" },
+  performance: { label: "Performance", color: "amber" },
+  compatibility: { label: "Compatibility", color: "violet" },
+};
+
 const features = [
   {
-    tag: "Build-time",
+    category: "buildtime",
     title: "Static resolution",
     desc: "Alloy scans your source at build time to emit a static dependency graph — no reflection, minimal runtime.",
     icon: "cpu",
   },
   {
-    tag: "Safety",
+    category: "safety",
     title: "Errors caught at build time",
     desc: "Circular dependencies and duplicate registrations fail the build — not a request in production.",
     icon: "check",
   },
   {
-    tag: "Code-split",
+    category: "performance",
     title: "First-class lazy loading",
     desc: "Granular code-splitting per service via Lazy() and dynamic imports. Pay only for what's needed.",
     icon: "layers",
   },
   {
-    tag: "Safety",
+    category: "safety",
     title: "Fully type-safe",
     desc: "Generates TypeScript definitions for every service identifier. Your IDE knows the whole graph.",
     icon: "shield",
   },
   {
-    tag: null,
+    category: "buildtime",
     title: "Visualized graph",
     desc: "Because the whole graph is known ahead of time, Alloy emits a Mermaid diagram of your services.",
     icon: "graph",
   },
   {
-    tag: null,
+    category: "compatibility",
     title: "Framework agnostic",
     desc: "Works with React, Vue, Svelte, or vanilla TypeScript. It's just a Vite plugin.",
     icon: "puzzle",
@@ -223,74 +232,121 @@ const benefits = [
 
     <!-- FEATURES -->
     <div class="alloy-features">
-      <div v-for="f in features" :key="f.title" class="feature-card">
-        <span v-if="f.tag" class="feature-tag">{{ f.tag }}</span>
+      <div
+        v-for="f in features"
+        :key="f.title"
+        class="feature-card"
+        :class="`fc-${categories[f.category].color}`"
+      >
+        <div class="feature-body">
+          <span class="feature-tag">{{ categories[f.category].label }}</span>
+          <p class="feature-title">{{ f.title }}</p>
+          <p class="feature-desc">{{ f.desc }}</p>
+        </div>
         <div class="feature-art">
           <svg
-            viewBox="0 0 48 48"
+            viewBox="0 0 60 96"
             fill="none"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="1"
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <!-- Static resolution: a chip resolving an internal graph -->
+            <!-- Static resolution: source files resolved through a chip -->
             <template v-if="f.icon === 'cpu'">
-              <rect class="art-fill" x="13" y="13" width="22" height="22" rx="5" />
+              <rect class="art-soft" x="11" y="8" width="16" height="19" rx="2.5" />
+              <rect class="art-soft" x="33" y="8" width="16" height="19" rx="2.5" />
+              <path class="art-muted" d="M15 14.5h8M15 18.5h6M37 14.5h8M37 18.5h6" />
+              <path d="M19 27v6M41 27v6" />
+              <path d="M15.5 31.5l3.5 3.5l3.5 -3.5M37.5 31.5l3.5 3.5l3.5 -3.5" />
+              <rect class="art-fill" x="12" y="40" width="36" height="34" rx="6" />
               <path
-                d="M19 7v6M29 7v6M19 35v6M29 35v6M7 19h6M7 29h6M35 19h6M35 29h6"
+                d="M22 36v4M38 36v4M22 74v4M38 74v4M8 49h4M8 65h4M48 49h4M48 65h4"
               />
-              <path d="M22 21.5l5 -1M21 23l3.5 4.5M28 21l-2.5 6" />
-              <circle class="art-fill" cx="20" cy="21" r="2.2" />
-              <circle class="art-fill" cx="29" cy="20" r="2.2" />
-              <circle class="art-key" cx="25" cy="29" r="2.8" />
+              <path class="art-muted" d="M23 52l7 5M37 52l-7 5M30 57v9" />
+              <circle class="art-soft" cx="23" cy="52" r="3" />
+              <circle class="art-soft" cx="37" cy="52" r="3" />
+              <circle class="art-solid" cx="30" cy="57" r="3.5" />
+              <circle class="art-soft" cx="30" cy="66" r="3" />
             </template>
-            <!-- Lazy loading: a bundle splitting into dynamically imported chunks -->
+
+            <!-- Errors caught at build time: a build checklist, one failure caught -->
+            <template v-else-if="f.icon === 'check'">
+              <rect class="art-fill" x="9" y="9" width="42" height="78" rx="7" />
+              <circle class="art-soft" cx="20" cy="25" r="5.5" />
+              <path d="M17 25l2.2 2.2l4 -4.6" />
+              <path class="art-muted" d="M31 25h13" />
+              <circle class="art-soft" cx="20" cy="42" r="5.5" />
+              <path d="M17 42l2.2 2.2l4 -4.6" />
+              <path class="art-muted" d="M31 42h13" />
+              <circle class="art-solid" cx="20" cy="59" r="5.5" />
+              <path class="art-knock" d="M17.6 56.6l4.8 4.8M22.4 56.6l-4.8 4.8" />
+              <path class="art-muted" d="M31 59h9" />
+              <circle class="art-soft" cx="20" cy="76" r="5.5" />
+              <path d="M17 76l2.2 2.2l4 -4.6" />
+              <path class="art-muted" d="M31 76h13" />
+            </template>
+
+            <!-- Performance: code loaded on demand, fast (lightning) -->
             <template v-else-if="f.icon === 'layers'">
-              <rect class="art-fill" x="6" y="15" width="18" height="18" rx="4" />
-              <path d="M24 21l7 -6" stroke-dasharray="2.5 3" />
-              <path d="M24 27l7 6" stroke-dasharray="2.5 3" />
-              <rect x="31" y="8" width="11" height="11" rx="3" />
-              <rect x="31" y="29" width="11" height="11" rx="3" />
-            </template>
-            <!-- Framework agnostic: a plug-in puzzle piece -->
-            <template v-else-if="f.icon === 'puzzle'">
-              <g transform="scale(2)">
+              <rect class="art-fill" x="13" y="6" width="34" height="20" rx="5" />
+              <path class="art-muted" d="M19 12h22M19 17h14M19 21h18" />
+              <g transform="translate(11 29) scale(1.7)">
                 <path
-                  class="art-fill"
-                  vector-effect="non-scaling-stroke"
-                  d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
+                  class="art-solid"
+                  d="M13 2L3 14h9l-1 8l10 -12h-9l1 -8z"
                 />
               </g>
+              <path d="M22 73l-6 9M38 73l6 9" stroke-dasharray="2.5 3" />
+              <rect class="art-soft" x="5" y="82" width="18" height="12" rx="3" />
+              <rect class="art-soft" x="37" y="82" width="18" height="12" rx="3" />
             </template>
-            <!-- Errors caught at build time: a shield with a check -->
-            <template v-else-if="f.icon === 'check'">
-              <path
-                class="art-fill"
-                d="M24 5l15 5v10c0 10 -6.5 16.5 -15 20.5c-8.5 -4 -15 -10.5 -15 -20.5v-10z"
-              />
-              <path d="M16 24l5.5 5.5l11 -12" />
+
+            <!-- Fully type-safe: a typed code editor -->
+            <template v-else-if="f.icon === 'shield'">
+              <rect class="art-fill" x="9" y="9" width="42" height="78" rx="7" />
+              <circle class="art-solid" cx="16" cy="18" r="1.8" />
+              <circle class="art-soft" cx="22" cy="18" r="1.8" />
+              <circle class="art-soft" cx="28" cy="18" r="1.8" />
+              <path class="art-muted" d="M9 26h42" />
+              <path class="art-muted" d="M15 35h9" />
+              <rect class="art-soft" x="27" y="31.5" width="14" height="7" rx="3.5" />
+              <path d="M19 48l-5 5l5 5M33 48l5 5l-5 5M30 46l-4 14" />
+              <path class="art-muted" d="M15 70h22M15 77h13" />
             </template>
-            <!-- Visualized graph: a small dependency DAG -->
+
+            <!-- Visualized graph: a vertical dependency DAG -->
             <template v-else-if="f.icon === 'graph'">
-              <path d="M10 14L24 24L10 36M24 24L38 14M24 24L38 36" />
-              <circle class="art-fill" cx="10" cy="14" r="3.2" />
-              <circle class="art-fill" cx="10" cy="36" r="3.2" />
-              <circle class="art-fill" cx="38" cy="14" r="3.2" />
-              <circle class="art-fill" cx="38" cy="36" r="3.2" />
-              <circle class="art-key" cx="24" cy="24" r="4" />
+              <path
+                class="art-muted"
+                d="M30 12L17 38M30 12L43 38M17 38L17 64M43 38L43 64M17 38L43 64M17 64L30 86M43 64L30 86"
+              />
+              <circle class="art-soft" cx="30" cy="12" r="5" />
+              <circle class="art-fill" cx="17" cy="38" r="5" />
+              <circle class="art-fill" cx="43" cy="38" r="5" />
+              <circle class="art-fill" cx="17" cy="64" r="5" />
+              <circle class="art-fill" cx="43" cy="64" r="5" />
+              <circle class="art-solid" cx="30" cy="86" r="6" />
             </template>
-            <!-- Fully type-safe: a code/type glyph -->
+
+            <!-- Framework agnostic: a hub plugging into many frameworks -->
             <template v-else>
-              <path d="M18 16L9 24l9 8" />
-              <path d="M30 16l9 8l-9 8" />
-              <path d="M26 13l-4 22" />
+              <path class="art-muted" d="M30 38v-18M30 58v18M20 48h-4M40 48h4" />
+              <rect class="art-soft" x="21" y="4" width="18" height="16" rx="4" />
+              <rect class="art-soft" x="21" y="76" width="18" height="16" rx="4" />
+              <rect class="art-soft" x="0" y="40" width="16" height="16" rx="4" />
+              <rect class="art-soft" x="44" y="40" width="16" height="16" rx="4" />
+              <path
+                class="art-muted"
+                d="M26 12h8M26 84h8M4 48h8M48 48h8"
+              />
+              <rect class="art-fill" x="20" y="38" width="20" height="20" rx="6" />
+              <circle class="art-solid" cx="30" cy="48" r="4" />
+              <path class="art-knock" d="M30 45v6M27 48h6" />
             </template>
           </svg>
         </div>
-        <p class="feature-title">{{ f.title }}</p>
-        <p class="feature-desc">{{ f.desc }}</p>
       </div>
     </div>
   </div>

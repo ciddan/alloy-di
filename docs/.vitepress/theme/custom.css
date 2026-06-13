@@ -16,6 +16,12 @@
   --alloy-accent: #3b6ea5;
   --alloy-accent-bright: #6daacf;
 
+  /* Card accent hues — light theme (deeper for contrast on white) */
+  --alloy-c-blue: #3b6ea5;
+  --alloy-c-teal: #0e9384;
+  --alloy-c-amber: #b76e00;
+  --alloy-c-violet: #7c4dde;
+
   /* Light theme surfaces & ink */
   --alloy-bg: #ffffff;
   --alloy-bg-soft: #f4f7fa;
@@ -49,6 +55,13 @@
   --alloy-faint: #4a6275;
   --alloy-label: #6a8595;
   --alloy-accent-ink: #6daacf;
+
+  /* Card accent hues — dark theme (brighter / more luminous) */
+  --alloy-c-blue: #6daacf;
+  --alloy-c-teal: #2dd4bf;
+  --alloy-c-amber: #fbbf24;
+  --alloy-c-violet: #b69cff;
+
   --alloy-border: rgba(142, 175, 194, 0.12);
   --alloy-border-strong: rgba(142, 175, 194, 0.25);
   --alloy-accent-border: rgba(59, 110, 165, 0.35);
@@ -479,97 +492,72 @@ h1.hero-headline,
   gap: 16px;
 }
 .feature-card {
+  --fc: var(--alloy-accent);
   position: relative;
+  display: flex;
   overflow: hidden;
   background: var(--alloy-bg);
   border: 0.5px solid var(--alloy-border);
   border-radius: 12px;
-  padding: 28px 26px;
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
     border-color 0.2s ease;
 }
-/* Faint dependency-graph node field, echoing the hero backdrop; brightens on
- * hover. */
-.feature-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: radial-gradient(
-    var(--alloy-accent) 1px,
-    transparent 1.5px
-  );
-  background-size: 22px 22px;
-  opacity: 0.1;
-  -webkit-mask-image: radial-gradient(
-    115% 80% at 88% 0%,
-    #000 0%,
-    transparent 70%
-  );
-  mask-image: radial-gradient(115% 80% at 88% 0%, #000 0%, transparent 70%);
-  transition: opacity 0.2s ease;
+/* Per-card accent hue */
+.fc-blue {
+  --fc: var(--alloy-c-blue);
 }
-/* Accent top edge, revealed on hover. */
+.fc-teal {
+  --fc: var(--alloy-c-teal);
+}
+.fc-amber {
+  --fc: var(--alloy-c-amber);
+}
+.fc-violet {
+  --fc: var(--alloy-c-violet);
+}
+/* Accent top edge, revealed on hover (flat, per-card hue). */
 .feature-card::after {
   content: "";
   position: absolute;
+  z-index: 2;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    var(--alloy-accent),
-    var(--alloy-accent-bright)
-  );
+  background: var(--fc);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 .feature-card:hover {
   transform: translateY(-3px);
-  border-color: var(--alloy-accent-border);
-  box-shadow: 0 14px 34px -16px rgba(59, 110, 165, 0.45);
-}
-.feature-card:hover::before {
-  opacity: 0.25;
+  border-color: color-mix(in srgb, var(--fc) 45%, transparent);
+  box-shadow: 0 14px 34px -16px color-mix(in srgb, var(--fc) 45%, transparent);
 }
 .feature-card:hover::after {
   opacity: 1;
 }
 
-/* Illustration: larger two-tone mini-diagram (accent stroke + soft fill). */
-.feature-art {
-  position: relative;
-  z-index: 1;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 20px;
-  color: var(--alloy-accent);
+/* Left: text content */
+.feature-body {
+  flex: 1;
+  min-width: 0;
+  padding: 26px 24px;
 }
-.dark .feature-art {
-  color: var(--alloy-accent-bright);
+.feature-tag {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-family: var(--alloy-font-mono);
+  font-size: 9px;
+  color: var(--fc);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  border: 0.5px solid color-mix(in srgb, var(--fc) 40%, transparent);
+  padding: 3px 7px;
+  border-radius: 3px;
 }
-.feature-art svg {
-  width: 52px;
-  height: 52px;
-}
-.feature-art .art-fill {
-  fill: var(--alloy-accent-soft);
-}
-.feature-art .art-key {
-  fill: var(--alloy-accent);
-  stroke: none;
-}
-.dark .feature-art .art-key {
-  fill: var(--alloy-accent-bright);
-}
-
 .feature-title {
-  position: relative;
-  z-index: 1;
   font-family: var(--alloy-font-display);
   font-size: 16px;
   font-weight: 600;
@@ -578,30 +566,78 @@ h1.hero-headline,
   letter-spacing: -0.01em;
 }
 .feature-desc {
-  position: relative;
-  z-index: 1;
   font-size: 13.5px;
   color: var(--alloy-dim);
   line-height: 1.65;
   margin: 0;
 }
-.feature-tag {
-  position: absolute;
-  z-index: 1;
-  top: 22px;
-  right: 22px;
-  font-family: var(--alloy-font-mono);
-  font-size: 9px;
-  color: var(--alloy-accent);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border: 0.5px solid var(--alloy-accent-border);
-  padding: 3px 7px;
-  border-radius: 3px;
-  background: var(--alloy-bg);
+
+/* Right: full-height illustration rail */
+.feature-art {
+  position: relative;
+  flex: 0 0 22%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  border-left: 0.5px solid var(--alloy-border);
+  background: color-mix(in srgb, var(--fc) 7%, transparent);
+  color: var(--fc);
 }
-.dark .feature-tag {
-  color: var(--alloy-accent-bright);
+/* Faint node-field in the rail, brightening on hover. */
+.feature-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--fc) 1px, transparent 1.5px);
+  background-size: 13px 13px;
+  opacity: 0.12;
+  transition: opacity 0.2s ease;
+}
+.feature-card:hover .feature-art::before {
+  opacity: 0.22;
+}
+.feature-art svg {
+  position: relative;
+  display: block;
+  /* fill the rail's full height; the rail clips any bleed */
+  width: 100%;
+  height: 100%;
+}
+.feature-art .art-fill {
+  fill: color-mix(in srgb, var(--fc) 16%, transparent);
+}
+.feature-art .art-soft {
+  fill: color-mix(in srgb, var(--fc) 9%, transparent);
+}
+.feature-art .art-solid {
+  fill: var(--fc);
+  stroke: none;
+}
+.feature-art .art-muted {
+  stroke: color-mix(in srgb, var(--fc) 45%, transparent);
+}
+.feature-art .art-knock {
+  stroke: var(--alloy-bg);
+}
+
+/* Stack the rail under the content on narrow screens */
+@media (max-width: 640px) {
+  .feature-card {
+    flex-direction: column;
+  }
+  .feature-art {
+    flex-basis: auto;
+    border-left: none;
+    border-top: 0.5px solid var(--alloy-border);
+    padding: 22px;
+  }
+  .feature-art svg {
+    width: auto;
+    height: 104px;
+  }
 }
 
 /* ---- BENEFITS ---- */
