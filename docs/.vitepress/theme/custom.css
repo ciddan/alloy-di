@@ -556,14 +556,16 @@ h1.hero-headline,
 .stat-arrow {
   margin-left: 6px;
   color: var(--alloy-accent);
-  opacity: 0;
-  transform: translateX(-3px);
+  opacity: 0.5;
   display: inline-block;
   transition: all 0.18s ease;
 }
+.dark .stat-arrow {
+  color: var(--alloy-accent-bright);
+}
 .stat-item--link:hover .stat-arrow {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateX(2px);
 }
 .stat-num {
   font-family: var(--alloy-font-display);

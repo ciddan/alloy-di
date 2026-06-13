@@ -68,10 +68,10 @@ const features = [
 ];
 
 const stats = [
-  { num: "Zero", label: "Runtime reflection" },
-  { num: "~3kb", label: "Runtime footprint" },
+  { num: "Zero", label: "Runtime reflection", link: "/guide/what-is-alloy" },
+  { num: "Lazy", label: "Code splitting", link: "/guide/lazy-loading" },
   { num: "Mermaid", label: "Dependency graph", link: "/guide/visualization" },
-  { num: "Vite 7+", label: "Compatibility" },
+  { num: "Automock", label: "Test container", link: "/guide/testing" },
 ];
 </script>
 

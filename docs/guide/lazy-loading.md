@@ -298,15 +298,15 @@ export class UsesDefaultExportService {
 
 ## Internal Implementation Highlights
 
-| File                    | Responsibility                                              |
-| ----------------------- | ----------------------------------------------------------- |
-| `src/lazy.ts`           | Defines `Lazy` wrapper and retry options                    |
-| `src/plugin/lazy.ts`    | AST traversal & class key extraction                        |
-| `src/plugin/codegen.ts` | Filters lazy class keys from eager imports                  |
-| `src/providers.ts`      | Placeholder creation (`asLazyClass`) & provider application |
-| `src/container.ts`      | Runtime resolution, retry logic, singleton caching          |
+| File                          | Responsibility                                              |
+| ----------------------------- | ----------------------------------------------------------- |
+| `src/lib/lazy.ts`             | Defines `Lazy` wrapper and retry options                    |
+| `src/plugins/core/lazy.ts`    | AST traversal & class key extraction                        |
+| `src/plugins/core/codegen.ts` | Filters lazy class keys from eager imports                  |
+| `src/lib/providers.ts`        | Placeholder creation (`asLazyClass`) & provider application |
+| `src/lib/container.ts`        | Runtime resolution, retry logic, singleton caching          |
 
-The hidden symbol `LAZY_PROVIDER_DESCRIPTOR` in `providers.ts` ensures metadata remains non-enumerable and avoids name collisions.
+The hidden symbol `LAZY_PROVIDER_DESCRIPTOR` in `src/lib/providers.ts` ensures metadata remains non-enumerable and avoids name collisions.
 
 ---
 

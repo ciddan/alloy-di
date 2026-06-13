@@ -194,6 +194,6 @@ export class UsesLazy {
 
 ## References
 
-- Manifest Schema: `packages/alloy/src/manifest-plugin.ts`
-- Consumer Plugin: `packages/alloy/src/plugin/index.ts`
+- Manifest Plugin: `packages/alloy/src/plugins/rollup-plugin/index.ts`
+- Consumer Plugin: `packages/alloy/src/plugins/vite-plugin/index.ts`
 - API Surface: https://alloy-di.dev/api/
