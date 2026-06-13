@@ -67,7 +67,7 @@ const features = [
   },
 ];
 
-const stats = [
+const benefits = [
   { num: "Zero", label: "Runtime reflection", link: "/guide/what-is-alloy" },
   { num: "Lazy", label: "Code splitting", link: "/guide/lazy-loading" },
   { num: "Mermaid", label: "Dependency graph", link: "/guide/visualization" },
@@ -124,15 +124,18 @@ const stats = [
             Dependency Injection.
           </h1>
           <p class="hero-desc">
-            Zero runtime reflection. Alloy resolves your dependency graph at
-            build time — generating a static, type-safe container that ships
-            nothing it doesn't use.
+            Build time safety. Zero runtime reflection. Alloy resolves your
+            dependency graph at build time — generating a static, type-safe
+            container that ships nothing it doesn't use.
           </p>
           <div class="hero-ctas">
             <a class="btn-primary" :href="withBase('/guide/getting-started')">
               Get started →
             </a>
-            <a class="btn-secondary" :href="withBase('/guide/what-is-alloy')">
+            <a
+              class="btn-secondary"
+              :href="withBase('/guide/what-is-alloy#why-alloy')"
+            >
               Why Alloy?
             </a>
             <button
@@ -228,19 +231,19 @@ const stats = [
       </div>
     </div>
 
-    <!-- STATS -->
-    <div class="alloy-stats">
+    <!-- BENEFITS -->
+    <div class="alloy-benefits">
       <component
-        v-for="s in stats"
-        :is="s.link ? 'a' : 'div'"
-        :key="s.label"
-        :href="s.link ? withBase(s.link) : undefined"
-        class="stat-item"
-        :class="{ 'stat-item--link': s.link }"
+        v-for="b in benefits"
+        :is="b.link ? 'a' : 'div'"
+        :key="b.label"
+        :href="b.link ? withBase(b.link) : undefined"
+        class="benefit"
+        :class="{ 'benefit--link': b.link }"
       >
-        <div class="stat-num">{{ s.num }}</div>
-        <div class="stat-label">
-          {{ s.label }}<span v-if="s.link" class="stat-arrow">→</span>
+        <div class="benefit-num">{{ b.num }}</div>
+        <div class="benefit-label">
+          {{ b.label }}<span v-if="b.link" class="benefit-arrow">→</span>
         </div>
       </component>
     </div>
