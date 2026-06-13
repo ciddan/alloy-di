@@ -67,7 +67,7 @@ describe("Vite Plugin Alloy - visualize option", () => {
     expect(diagram).toContain("graph TB");
     expect(diagram).toContain('["MainService"]');
     expect(diagram).toContain('["DepService"]');
-    expect(diagram).toMatch(/Eager · [^→]+→[^·]+ · Class/);
+    expect(diagram).toMatch(/-->\|Tr→Tr\|/);
     expect(diagram.trim().length).toBeGreaterThan(0);
   });
 });

@@ -10,7 +10,8 @@ packages/alloy/src/plugins/
 │   └── index.ts          # Main Vite plugin entry point (discovery, manifest ingestion, provider imports)
 ├── core/
 │   ├── codegen.ts        # Generates virtual container module (imports, stubs, registrations, provider application)
-│   ├── scanner.ts        # Decorator + Lazy discovery (AST-like text scanning)
+│   ├── scanner.ts        # Decorator + Lazy discovery via the TypeScript compiler AST
+│   ├── lazy.ts           # Detects Lazy(...) calls and extracts class keys
 │   ├── types.ts          # Shared metadata types used by plugins/core
 │   └── utils.ts          # General helpers (paths, hashing, alias generation)
 ├── rollup-plugin/
@@ -36,21 +37,17 @@ packages/alloy/src/plugins/
 
 ### `core/scanner.ts`
 
-- Parses source text to collect decorated classes and extracts raw options text.
-- Detects `Lazy(...)` references and records unique class keys for codegen decisions.
+- Walks the TypeScript compiler AST to collect decorated classes and extract their decorator options.
+- Delegates `Lazy(...)` detection to `core/lazy.ts`, recording unique class keys for codegen decisions.
 
 ### `core/utils.ts`
 
 - Shared helpers for hashing, alias creation, and POSIX path normalization used across plugins.
 
-### `vite-plugin/utils.ts`
-
-- Shared helpers for hashing, alias creation, and POSIX path normalization used by both the discoverer and the code generator.
-
 ## Flow overview
 
-1. `alloy()` registers Vite hooks using the state holders in `plugin/index.ts`.
-2. During `transform`, the AST walker records decorated classes and forwards every call expression to `processLazyCall` from `lazy.ts`.
+1. `alloy()` registers Vite hooks using the state holders in `vite-plugin/index.ts`.
+2. During `transform`, the scanner walks the TypeScript AST, records decorated classes, and forwards call expressions to `processLazyCall` from `core/lazy.ts`.
 3. When Vite requests the `virtual:alloy-container` module, the plugin passes the collected metadata + lazy-only set into `generateContainerModule()`.
 4. The generated container imports only eagerly referenced services; lazy-only and factory-lazy (`lazyServices`) entries receive stubs plus `factory: Lazy(...)` metadata.
 5. Provider modules are imported and `applyProviders(container, ...)` is invoked after decorator-based registrations, enabling external libraries to register values, services, and lazy services.

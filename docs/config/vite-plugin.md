@@ -85,10 +85,39 @@ Relative paths are resolved against the project root.
 
 ### visualize
 
-- **Type:** `boolean | { mermaid?: boolean | { outputPath?: string; direction?: "LR" | "TB" | "BT" | "RL"; includeLegend?: boolean; scopeColors?: Partial<Record<ServiceScope, string>>; lazyNodeFill?: string; factoryNodeFill?: string; tokenNodeFill?: string; nodeStrokeColor?: string; nodeTextColor?: string; lazyEdgeColor?: string; eagerEdgeColor?: string; factoryEdgeColor?: string } }`
+- **Type:** `boolean | AlloyVisualizationOptions`
 - **Default:** `false`
 
-Enables dependency graph emission. When set to `true`, the plugin writes a Mermaid (`.mmd`) diagram named `alloy-di.mmd` in the project root each time the container is regenerated. Provide an object to override the output path or any stylistic options supported by the visualizer.
+```ts
+interface AlloyVisualizationOptions {
+  // Emit a Mermaid diagram. `true` uses defaults; pass an object to customize.
+  mermaid?: boolean | AlloyMermaidVisualizerOptions;
+}
+
+interface AlloyMermaidVisualizerOptions {
+  // Where to write the .mmd file (default: "./alloy-di.mmd").
+  outputPath?: string;
+  // Graph direction (default: "LR").
+  direction?: "LR" | "TB" | "BT" | "RL";
+  // Include the legend comment block (default: true).
+  includeLegend?: boolean;
+
+  // Node fills.
+  scopeColors?: Partial<Record<ServiceScope, string>>;
+  lazyNodeFill?: string;
+  factoryNodeFill?: string;
+  tokenNodeFill?: string;
+  nodeStrokeColor?: string;
+  nodeTextColor?: string;
+
+  // Edge colors.
+  lazyEdgeColor?: string;
+  eagerEdgeColor?: string;
+  factoryEdgeColor?: string;
+}
+```
+
+Enables dependency graph emission. When set to `true`, the plugin writes a Mermaid (`.mmd`) diagram named `alloy-di.mmd` in the project root each time the container is regenerated. Provide an object to override the output path or any stylistic options supported by the visualizer. See [Dependency Graph Visualization](/guide/visualization) for how to read and render the output.
 
 ```ts
 alloy({

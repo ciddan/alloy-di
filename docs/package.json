@@ -12,6 +12,7 @@
     "lint:check": "oxlint --type-aware --config ./.oxlintrc.json ."
   },
   "devDependencies": {
+    "mermaid": "^11.4.0",
     "vitepress": "2.0.0-alpha.15",
     "vue": "^3.5.35"
   },

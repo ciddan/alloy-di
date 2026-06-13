@@ -90,11 +90,9 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.diagram).toContain("graph LR");
     expect(artifact.diagram).toContain('id_ServiceA["ServiceA"]');
     expect(artifact.diagram).toContain('id_ServiceB["ServiceB"]');
-    expect(artifact.diagram).toContain(
-      "id_ServiceA -->|Eager · singleton→transient · Class| id_ServiceB",
-    );
-    expect(artifact.diagram).toMatch(/singleton→token · Token/);
-    expect(artifact.diagram).toContain("style token_ConfigToken fill:#d1d5db");
+    expect(artifact.diagram).toContain("id_ServiceA -->|Si→Tr| id_ServiceB");
+    expect(artifact.diagram).toMatch(/Si→Tk/);
+    expect(artifact.diagram).toContain("style token_ConfigToken fill:#4b5c6b");
   });
 
   it("styles lazy-only and factory services distinctly", () => {
@@ -122,8 +120,8 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.nodeCount).toBe(2);
     expect(artifact.edgeCount).toBe(0);
 
-    expect(artifact.diagram).toContain("style id_LazyOnly fill:#e8def8");
-    expect(artifact.diagram).toContain("style id_Factory fill:#ffe0b2");
+    expect(artifact.diagram).toContain("style id_LazyOnly fill:#6c5cb8");
+    expect(artifact.diagram).toContain("style id_Factory fill:#9c6516");
   });
 
   it("resolves dependencies via import alias metadata", () => {
@@ -156,9 +154,7 @@ describe("generateMermaidDiagram", () => {
     expect(artifact.nodeCount).toBe(2);
     expect(artifact.edgeCount).toBe(1);
     expect(artifact.tokenCount).toBe(0);
-    expect(artifact.diagram).toContain(
-      "id_Main -->|Eager · singleton→transient · Class| id_RealDep",
-    );
+    expect(artifact.diagram).toContain("id_Main -->|Si→Tr| id_RealDep");
   });
 
   it("filters ignored helper identifiers from the graph", () => {
@@ -197,7 +193,7 @@ describe("generateMermaidDiagram", () => {
 
     expect(artifact.edgeCount).toBe(1);
     expect(artifact.diagram).toContain(
-      "id_Consumer -.->|Lazy · transient→transient · Class| id_LazyService",
+      "id_Consumer -.->|Tr→Tr| id_LazyService",
     );
     expect(artifact.diagram).not.toContain("token_then");
     expect(artifact.diagram).not.toContain("token_m");
@@ -230,9 +226,7 @@ describe("generateMermaidDiagram", () => {
     });
 
     expect(artifact.edgeCount).toBe(1);
-    expect(artifact.diagram).toContain(
-      "id_InferConsumer -.->|Lazy · singleton→transient · Class| id_Lazy",
-    );
+    expect(artifact.diagram).toContain("id_InferConsumer -.->|Si→Tr| id_Lazy");
   });
 
   it("deduplicates token nodes and trims long labels", () => {
@@ -284,7 +278,7 @@ describe("generateMermaidDiagram", () => {
 
     expect(artifact.edgeCount).toBe(1);
     expect(artifact.diagram).toContain(
-      "id_AbsoluteConsumer -->|Eager · transient→singleton · Class| id_Absolute",
+      "id_AbsoluteConsumer -->|Tr→Si| id_Absolute",
     );
   });
 
