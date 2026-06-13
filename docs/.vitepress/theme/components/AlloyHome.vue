@@ -245,105 +245,56 @@ const benefits = [
         </div>
         <div class="feature-art">
           <svg
-            viewBox="0 0 60 96"
+            viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="1"
+            stroke-width="1.5"
             stroke-linecap="round"
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <!-- Static resolution: source files resolved through a chip -->
+            <!-- Static resolution: chip -->
             <template v-if="f.icon === 'cpu'">
-              <rect class="art-soft" x="11" y="8" width="16" height="19" rx="2.5" />
-              <rect class="art-soft" x="33" y="8" width="16" height="19" rx="2.5" />
-              <path class="art-muted" d="M15 14.5h8M15 18.5h6M37 14.5h8M37 18.5h6" />
-              <path d="M19 27v6M41 27v6" />
-              <path d="M15.5 31.5l3.5 3.5l3.5 -3.5M37.5 31.5l3.5 3.5l3.5 -3.5" />
-              <rect class="art-fill" x="12" y="40" width="36" height="34" rx="6" />
               <path
-                d="M22 36v4M38 36v4M22 74v4M38 74v4M8 49h4M8 65h4M48 49h4M48 65h4"
+                d="M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1z"
               />
-              <path class="art-muted" d="M23 52l7 5M37 52l-7 5M30 57v9" />
-              <circle class="art-soft" cx="23" cy="52" r="3" />
-              <circle class="art-soft" cx="37" cy="52" r="3" />
-              <circle class="art-solid" cx="30" cy="57" r="3.5" />
-              <circle class="art-soft" cx="30" cy="66" r="3" />
+              <path d="M9 9h6v6h-6z" />
+              <path
+                d="M3 10h2M3 14h2M10 3v2M14 3v2M21 10h-2M21 14h-2M14 21v-2M10 21v-2"
+              />
             </template>
 
-            <!-- Errors caught at build time: a build checklist, one failure caught -->
+            <!-- Errors caught at build time: circle-check -->
             <template v-else-if="f.icon === 'check'">
-              <rect class="art-fill" x="9" y="9" width="42" height="78" rx="7" />
-              <circle class="art-soft" cx="20" cy="25" r="5.5" />
-              <path d="M17 25l2.2 2.2l4 -4.6" />
-              <path class="art-muted" d="M31 25h13" />
-              <circle class="art-soft" cx="20" cy="42" r="5.5" />
-              <path d="M17 42l2.2 2.2l4 -4.6" />
-              <path class="art-muted" d="M31 42h13" />
-              <circle class="art-solid" cx="20" cy="59" r="5.5" />
-              <path class="art-knock" d="M17.6 56.6l4.8 4.8M22.4 56.6l-4.8 4.8" />
-              <path class="art-muted" d="M31 59h9" />
-              <circle class="art-soft" cx="20" cy="76" r="5.5" />
-              <path d="M17 76l2.2 2.2l4 -4.6" />
-              <path class="art-muted" d="M31 76h13" />
+              <circle cx="12" cy="12" r="9" />
+              <path d="M8.5 12l2.5 2.5l4.5 -5" />
             </template>
 
-            <!-- Performance: code loaded on demand, fast (lightning) -->
+            <!-- Performance: lightning bolt -->
             <template v-else-if="f.icon === 'layers'">
-              <rect class="art-fill" x="13" y="6" width="34" height="20" rx="5" />
-              <path class="art-muted" d="M19 12h22M19 17h14M19 21h18" />
-              <g transform="translate(11 29) scale(1.7)">
-                <path
-                  class="art-solid"
-                  d="M13 2L3 14h9l-1 8l10 -12h-9l1 -8z"
-                />
-              </g>
-              <path d="M22 73l-6 9M38 73l6 9" stroke-dasharray="2.5 3" />
-              <rect class="art-soft" x="5" y="82" width="18" height="12" rx="3" />
-              <rect class="art-soft" x="37" y="82" width="18" height="12" rx="3" />
+              <path d="M13 2L3 14h9l-1 8l10 -12h-9l1 -8z" />
             </template>
 
-            <!-- Fully type-safe: a typed code editor -->
-            <template v-else-if="f.icon === 'shield'">
-              <rect class="art-fill" x="9" y="9" width="42" height="78" rx="7" />
-              <circle class="art-solid" cx="16" cy="18" r="1.8" />
-              <circle class="art-soft" cx="22" cy="18" r="1.8" />
-              <circle class="art-soft" cx="28" cy="18" r="1.8" />
-              <path class="art-muted" d="M9 26h42" />
-              <path class="art-muted" d="M15 35h9" />
-              <rect class="art-soft" x="27" y="31.5" width="14" height="7" rx="3.5" />
-              <path d="M19 48l-5 5l5 5M33 48l5 5l-5 5M30 46l-4 14" />
-              <path class="art-muted" d="M15 70h22M15 77h13" />
-            </template>
-
-            <!-- Visualized graph: a vertical dependency DAG -->
+            <!-- Visualized graph: node graph -->
             <template v-else-if="f.icon === 'graph'">
-              <path
-                class="art-muted"
-                d="M30 12L17 38M30 12L43 38M17 38L17 64M43 38L43 64M17 38L43 64M17 64L30 86M43 64L30 86"
-              />
-              <circle class="art-soft" cx="30" cy="12" r="5" />
-              <circle class="art-fill" cx="17" cy="38" r="5" />
-              <circle class="art-fill" cx="43" cy="38" r="5" />
-              <circle class="art-fill" cx="17" cy="64" r="5" />
-              <circle class="art-fill" cx="43" cy="64" r="5" />
-              <circle class="art-solid" cx="30" cy="86" r="6" />
+              <circle cx="6" cy="6" r="2.5" />
+              <circle cx="6" cy="18" r="2.5" />
+              <circle cx="18" cy="12" r="2.5" />
+              <path d="M8.2 7.2l7.6 3.6M8.2 16.8l7.6 -3.6" />
             </template>
 
-            <!-- Framework agnostic: a hub plugging into many frameworks -->
-            <template v-else>
-              <path class="art-muted" d="M30 38v-18M30 58v18M20 48h-4M40 48h4" />
-              <rect class="art-soft" x="21" y="4" width="18" height="16" rx="4" />
-              <rect class="art-soft" x="21" y="76" width="18" height="16" rx="4" />
-              <rect class="art-soft" x="0" y="40" width="16" height="16" rx="4" />
-              <rect class="art-soft" x="44" y="40" width="16" height="16" rx="4" />
+            <!-- Framework agnostic: puzzle piece -->
+            <template v-else-if="f.icon === 'puzzle'">
               <path
-                class="art-muted"
-                d="M26 12h8M26 84h8M4 48h8M48 48h8"
+                d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
               />
-              <rect class="art-fill" x="20" y="38" width="20" height="20" rx="6" />
-              <circle class="art-solid" cx="30" cy="48" r="4" />
-              <path class="art-knock" d="M30 45v6M27 48h6" />
+            </template>
+
+            <!-- Fully type-safe: code brackets -->
+            <template v-else>
+              <path d="M8 9l-4 3l4 3" />
+              <path d="M16 9l4 3l-4 3" />
+              <path d="M13 7l-2 10" />
             </template>
           </svg>
         </div>

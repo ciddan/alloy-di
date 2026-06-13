@@ -517,6 +517,28 @@ h1.hero-headline,
 .fc-violet {
   --fc: var(--alloy-c-violet);
 }
+/* Dotted node-field, concentrated on the right and fading out toward the left
+ * through a soft elliptical mask (no hard frame); brightens on hover. */
+.feature-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--fc) 1px, transparent 1.5px);
+  background-size: 13px 13px;
+  opacity: 0.14;
+  -webkit-mask-image: radial-gradient(
+    78% 130% at 100% 50%,
+    #000 0%,
+    transparent 74%
+  );
+  mask-image: radial-gradient(78% 130% at 100% 50%, #000 0%, transparent 74%);
+  transition: opacity 0.2s ease;
+}
+.feature-card:hover::before {
+  opacity: 0.24;
+}
 /* Accent top edge, revealed on hover (flat, per-card hue). */
 .feature-card::after {
   content: "";
@@ -541,6 +563,8 @@ h1.hero-headline,
 
 /* Left: text content */
 .feature-body {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   padding: 26px 24px;
@@ -572,71 +596,30 @@ h1.hero-headline,
   margin: 0;
 }
 
-/* Right: full-height illustration rail */
+/* Right: icon rail — no frame; the card's dotted field sits behind it */
 .feature-art {
   position: relative;
+  z-index: 1;
   flex: 0 0 22%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  overflow: hidden;
-  border-left: 0.5px solid var(--alloy-border);
-  background: color-mix(in srgb, var(--fc) 7%, transparent);
   color: var(--fc);
 }
-/* Faint node-field in the rail, brightening on hover. */
-.feature-art::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(var(--fc) 1px, transparent 1.5px);
-  background-size: 13px 13px;
-  opacity: 0.12;
-  transition: opacity 0.2s ease;
-}
-.feature-card:hover .feature-art::before {
-  opacity: 0.22;
-}
 .feature-art svg {
-  position: relative;
-  display: block;
-  /* fill the rail's full height; the rail clips any bleed */
-  width: 100%;
-  height: 100%;
-}
-.feature-art .art-fill {
-  fill: color-mix(in srgb, var(--fc) 16%, transparent);
-}
-.feature-art .art-soft {
-  fill: color-mix(in srgb, var(--fc) 9%, transparent);
-}
-.feature-art .art-solid {
-  fill: var(--fc);
-  stroke: none;
-}
-.feature-art .art-muted {
-  stroke: color-mix(in srgb, var(--fc) 45%, transparent);
-}
-.feature-art .art-knock {
-  stroke: var(--alloy-bg);
+  width: 44px;
+  height: 44px;
 }
 
-/* Stack the rail under the content on narrow screens */
+/* Stack the icon under the content on narrow screens */
 @media (max-width: 640px) {
   .feature-card {
     flex-direction: column;
   }
   .feature-art {
     flex-basis: auto;
-    border-left: none;
-    border-top: 0.5px solid var(--alloy-border);
-    padding: 22px;
-  }
-  .feature-art svg {
-    width: auto;
-    height: 104px;
+    justify-content: flex-start;
+    padding: 0 24px 24px;
   }
 }
 
