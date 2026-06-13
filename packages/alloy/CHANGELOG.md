@@ -1,5 +1,80 @@
 # alloy-di
 
+## 1.3.0
+
+### Minor Changes
+
+- 3e389fd: Fix production-mode detection in bundled browser apps, and let the Vite
+  plugin pin the mode at build time. `isDevEnvironment` read `import.meta.env`
+  through an intermediate variable and guarded `process.env.NODE_ENV` behind
+  `typeof process`, both of which defeat bundlers' static define replacement —
+  so a standard Vite production browser build detected no hints, fell back to
+  dev mode, and emitted the factory-lazy warning in production. Detection now
+  keeps the literal `import.meta.env` / `process.env.NODE_ENV` expressions so
+  replacement applies. Additionally, the generated container module now calls
+  the new `setEnvDetectionOverrides({ isDev })` runtime export with the
+  bundler's authoritative mode, so plugin-driven setups never rely on runtime
+  sniffing at all. The no-hints fallback remains development, which keeps
+  warnings working in plain-Node usage.
+
+### Patch Changes
+
+- 42efea5: Rewrite dependency-expression identifiers by AST position instead of a
+  `\b`-regex text replacement. The regex never matched `$`-prefixed class names
+  (leaving the generated module referencing an unimported or wrong binding) and
+  rewrote matching text inside string literals and property names — a renamed
+  identifier could corrupt a lazy `import('/src/Api')` specifier or an
+  `m.Api` export access. Expressions are now parsed and only true identifier
+  references are rewritten; shorthand object properties expand
+  (`{ Api }` -> `{ Api: Api_1 }`) so keys survive renames.
+- 1f3b1e2: Cut redundant TS parsing during discovery. The discovery store now keeps a
+  content hash per file and serves identical content from its cache, which
+  collapses the buildStart pre-scan + transform double parse into a single
+  scan per file content. The scanner also skips the TS parse entirely for
+  files that cannot contribute discovery results — no `@` (required by
+  decorator syntax) and no `Lazy` identifier. Note the pre-filter deliberately
+  does not check for the `Injectable`/`Singleton` names: decorator provenance
+  supports renamed re-exports (`export { Injectable as Register }`), so a
+  service file may contain neither.
+- 2442156: Skip rewriting generated artifacts whose content has not changed. Every
+  container load wrote `alloy-container.d.ts`, `alloy-manifests.d.ts`, and the
+  Mermaid diagram unconditionally — in dev that happens on every HMR-triggered
+  regeneration and pokes tsc --watch, IDE TypeScript servers, and file
+  watchers (including the bundler's own) for no reason. All three artifacts
+  now go through a write-if-changed helper that serves repeat regenerations
+  from an in-memory record of the last written content (the artifacts are
+  volatile — manual edits are clobbered on the next content change), falling
+  back to a disk read-compare only on the first emission of a session. The
+  generated declaration files and the Mermaid diagram now carry an
+  "auto-generated, manual changes will be overwritten" header making that
+  explicit.
+- 219652b: Warn when a library manifest fails schema validation instead of dropping it
+  silently. A dropped manifest removes all of that library's services and
+  providers from the container, and the first symptom was an unrelated-looking
+  resolution error at runtime in the consuming app. The build now logs
+  `[alloy] Ignoring invalid manifest "<packageName>"` together with the zod
+  validation issues.
+- 7ee6bbf: Refresh the dependency-graph visualizer's default palette to a cohesive,
+  brand-aligned scheme: steel-blue singletons, teal transients, violet lazy-only
+  services, bronze factories, and slate tokens, with white node text for stronger
+  contrast. Eager/lazy/factory edge colors were retuned to match. All colors
+  remain overridable via the `visualize.mermaid` options; only the defaults
+  changed.
+
+  Edge labels are now a compact `source→target` scope transition (e.g. `Si→Tr`,
+  with `Si`/`Tr`/`Tk` for singleton/transient/token) instead of the verbose
+  `Eager · singleton→transient · Class` form. The eager/lazy nature is already
+  conveyed by the arrow style and the target kind by node color, and a key is
+  emitted in the legend comment.
+
+- 3e389fd: Harden the `buildStart` source scan against symlink cycles. A symlink under
+  `src/` pointing back at an ancestor directory made the recursive walk follow
+  it until the kernel's `ELOOP` limit aborted the build. Directories are now
+  tracked by real path so cycles terminate (symlinked directories are still
+  followed once), broken symlinks are skipped, dotfiles and dot-directories
+  are no longer scanned, and the walk stats each entry once via dirents
+  instead of twice.
+
 ## 1.2.3
 
 ### Patch Changes
