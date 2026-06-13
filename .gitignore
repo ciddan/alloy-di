@@ -12,6 +12,7 @@ coverage/
 packages/**/tsconfig.tsbuildinfo
 **/src/alloy-container.d.ts
 **/src/alloy-manifests.d.ts
+**/src/alloy-scopes.d.ts
 
 # Logs
 npm-debug.log*

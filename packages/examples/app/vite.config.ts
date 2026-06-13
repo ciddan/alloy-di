@@ -20,6 +20,10 @@ export default defineConfig(async () => {
         providers: ["src/providers.ts"],
         manifests: [manifest],
         lazyServices: [ReportingServiceIdentifier],
+        scopes: {
+          session: { parent: "singleton" },
+          request: { parent: "session" },
+        },
         visualize: {
           mermaid: {
             outputPath: "./analytics/container.mmd",

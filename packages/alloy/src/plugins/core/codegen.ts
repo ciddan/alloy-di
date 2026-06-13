@@ -758,12 +758,10 @@ export const GENERATED_FILE_HEADER = `/**
  *
  * @param metas - List of discovered services.
  * @param pathResolver - Function to resolve absolute file paths to import paths relative to the declaration file location.
- * @param scopeNames - Custom scope names to register as `AlloyScopes` keys, making `@Injectable('<scope>')` type-check.
  */
 export function generateContainerTypeDefinition(
   metas: DiscoveredMeta[],
   pathResolver: (path: string) => string,
-  scopeNames: string[] = [],
 ): string {
   const resolver = new IdentifierResolver(metas);
   // The declaration module imports Container and ServiceIdentifier from the
@@ -812,27 +810,37 @@ declare module "virtual:alloy-container" {
   const container: Container;
   export default container;
 }
-${generateScopeAugmentation(scopeNames)}`;
+`;
 }
 
 /**
- * Generates the module augmentation that registers custom scope names as keys
- * of `AlloyScopes`, opening the `ServiceScope` union so `@Injectable('session')`
- * type-checks. Returns an empty string when no custom scopes are configured.
+ * Generates a standalone declaration file that augments `AlloyScopes` with the
+ * custom scope names, opening the `ServiceScope` union so `@Injectable('<scope>')`
+ * type-checks. Returns `undefined` when no custom scopes are configured.
+ *
+ * This MUST live in its own file: module augmentation requires the file to be a
+ * module (hence the trailing `export {}`), whereas the container declaration
+ * must stay a global script so `virtual:alloy-container` resolves everywhere.
+ * Combining the two in one file turns the container declaration into a module
+ * and breaks resolution of the virtual module.
  */
-function generateScopeAugmentation(scopeNames: string[]): string {
+export function generateScopeAugmentationDefinition(
+  scopeNames: string[],
+): string | undefined {
   if (!scopeNames.length) {
-    return "";
+    return undefined;
   }
   const members = scopeNames
     .map((name) => `    ${JSON.stringify(name)}: true;`)
     .join("\n");
-  return `
+  return `${GENERATED_FILE_HEADER}
 declare module "alloy-di/runtime" {
   interface AlloyScopes {
 ${members}
   }
 }
+
+export {};
 `;
 }
 

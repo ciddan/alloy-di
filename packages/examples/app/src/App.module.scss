@@ -47,3 +47,61 @@
     background-color: #f9f9f9;
   }
 }
+
+.demoSection {
+  margin-top: 2.5rem;
+  padding: 2rem;
+  border: 1px solid #3a3a4f;
+  border-radius: 12px;
+  background-color: #171724;
+  text-align: left;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.demoTitle {
+  font-size: 1.8em;
+  margin-top: 0;
+  margin-bottom: 1.2rem;
+  color: #629fd0;
+  border-bottom: 1px solid #3a3a4f;
+  padding-bottom: 0.5rem;
+}
+
+.demoCard {
+  background-color: #1e1e2f;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border: 1px solid #29293d;
+}
+
+.statusLabel {
+  font-weight: bold;
+  color: #a0a0b8;
+  margin-right: 0.5rem;
+}
+
+.statusValue {
+  color: #e2e2e9;
+  font-family: monospace;
+}
+
+.logsContainer {
+  background-color: #0b0b12;
+  padding: 1rem;
+  border-radius: 6px;
+  font-family: "JetBrains Mono", Courier, monospace;
+  font-size: 0.9em;
+  color: #4af626;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #1a1a2e;
+  margin-top: 1rem;
+}
+
+.logEntry {
+  margin: 0.3rem 0;
+}
+

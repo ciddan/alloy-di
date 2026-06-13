@@ -5,6 +5,7 @@ import {
   generateContainerModule,
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
+  generateScopeAugmentationDefinition,
 } from "./codegen";
 import type { AlloyManifest, DiscoveredMeta } from "./types";
 import { normalizeImportPath, writeFileIfChanged } from "./utils";
@@ -185,10 +186,8 @@ function writeTypeDefinitions(
   scopes: AlloyScopesConfig | undefined,
 ): void {
   const dtsDir = path.resolve(resolvedRoot, containerDeclarationDir ?? "./src");
-  const dtsContent = generateContainerTypeDefinition(
-    metas,
-    (filePath) => resolveDeclarationImportPath(dtsDir, filePath),
-    scopes ? Object.keys(scopes) : [],
+  const dtsContent = generateContainerTypeDefinition(metas, (filePath) =>
+    resolveDeclarationImportPath(dtsDir, filePath),
   );
 
   if (!fs.existsSync(dtsDir)) {
@@ -196,6 +195,20 @@ function writeTypeDefinitions(
   }
 
   writeFileIfChanged(path.join(dtsDir, "alloy-container.d.ts"), dtsContent);
+
+  // The AlloyScopes augmentation lives in its own file: it must be a module
+  // (module augmentation), while the container declaration must remain a global
+  // script so `virtual:alloy-container` resolves everywhere.
+  const scopeAugmentationPath = path.join(dtsDir, "alloy-scopes.d.ts");
+  const scopeAugmentation = generateScopeAugmentationDefinition(
+    scopes ? Object.keys(scopes) : [],
+  );
+  if (scopeAugmentation) {
+    writeFileIfChanged(scopeAugmentationPath, scopeAugmentation);
+  } else if (fs.existsSync(scopeAugmentationPath)) {
+    // Remove a stale augmentation when scopes are no longer configured.
+    fs.rmSync(scopeAugmentationPath);
+  }
 
   if (loadedManifests.length === 0) {
     return;
