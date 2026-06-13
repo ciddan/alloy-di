@@ -1,5 +1,11 @@
 # alloy-di
 
+## 1.4.0
+
+### Minor Changes
+
+- fd45330: Add support for hierarchical scopes, enabling custom lifecycles like `session` and `request` between `singleton` and `transient`.
+
 ## 1.3.0
 
 ### Minor Changes
