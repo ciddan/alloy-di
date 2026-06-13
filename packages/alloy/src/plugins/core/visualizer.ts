@@ -58,8 +58,8 @@ export interface MermaidDiagramArtifact {
 }
 
 const DEFAULT_SCOPE_COLORS: Record<ServiceScope, string> = {
-  singleton: "#f6c14a",
-  transient: "#58a6ff",
+  singleton: "#3b6ea5",
+  transient: "#2a7d73",
 };
 
 const DEFAULT_OPTIONS: Required<
@@ -81,14 +81,14 @@ const DEFAULT_OPTIONS: Required<
   direction: "LR",
   includeLegend: true,
   scopeColors: DEFAULT_SCOPE_COLORS,
-  lazyNodeFill: "#e8def8",
-  factoryNodeFill: "#ffe0b2",
-  tokenNodeFill: "#d1d5db",
-  nodeStrokeColor: "#1f2937",
-  nodeTextColor: "#111827",
-  lazyEdgeColor: "#a855f7",
-  eagerEdgeColor: "#6b7280",
-  factoryEdgeColor: "#ef6c00",
+  lazyNodeFill: "#6c5cb8",
+  factoryNodeFill: "#9c6516",
+  tokenNodeFill: "#4b5c6b",
+  nodeStrokeColor: "#5a7488",
+  nodeTextColor: "#ffffff",
+  lazyEdgeColor: "#9385d6",
+  eagerEdgeColor: "#7c93a6",
+  factoryEdgeColor: "#c2922e",
 };
 
 const RESERVED_IDENTIFIERS = new Set([
@@ -202,7 +202,7 @@ export function generateMermaidDiagram({
         edges.push({
           from: sourceNode,
           to: target,
-          label: describeEdge(sourceNode, target, dep.isLazy),
+          label: describeEdge(sourceNode, target),
           isLazy: dep.isLazy,
           stroke: selectEdgeColor(dep.isLazy, target, mergedOptions),
         });
@@ -218,6 +218,9 @@ export function generateMermaidDiagram({
     );
     lines.push(
       `  %% Edge colors: eager=${mergedOptions.eagerEdgeColor}, lazy=${mergedOptions.lazyEdgeColor}, factory=${mergedOptions.factoryEdgeColor}`,
+    );
+    lines.push(
+      `  %% Edge labels: Si=singleton, Tr=transient, Tk=token; solid=eager, dotted=lazy`,
     );
   }
 
@@ -291,20 +294,22 @@ function escapeMermaidLabel(label: string): string {
   return label.replaceAll('"', '\\"').replaceAll("|", "/");
 }
 
+const SCOPE_ABBREVIATIONS: Record<string, string> = {
+  singleton: "Si",
+  transient: "Tr",
+  token: "Tk",
+};
+
 /**
- * Builds a human-readable label describing the nature of an edge between two nodes.
+ * Builds a compact edge label as a `source→target` scope transition (e.g.
+ * `Si→Tr`). Eager/lazy is conveyed by the arrow style and the target kind by
+ * node color, so they are intentionally omitted from the text. See the legend.
  */
-function describeEdge(
-  from: GraphNode,
-  to: GraphNode,
-  depIsLazy: boolean,
-): string {
-  const nature = depIsLazy ? "Lazy" : "Eager";
-  const fromScope = from.scope ?? "unknown";
-  const toScope = to.type === "token" ? "token" : (to.scope ?? "unknown");
-  const targetType =
-    to.type === "token" ? "Token" : to.hasFactory ? "Factory" : "Class";
-  return `${nature} · ${fromScope}→${toScope} · ${targetType}`;
+function describeEdge(from: GraphNode, to: GraphNode): string {
+  const fromScope = SCOPE_ABBREVIATIONS[from.scope ?? ""] ?? "?";
+  const toKey = to.type === "token" ? "token" : (to.scope ?? "");
+  const toScope = SCOPE_ABBREVIATIONS[toKey] ?? "?";
+  return `${fromScope}→${toScope}`;
 }
 
 /**

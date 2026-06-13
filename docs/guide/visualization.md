@@ -10,26 +10,27 @@ The diagram below is what Alloy produces for a small container:
 
 ```mermaid
 graph LR
-  %% Legend: singleton=#f6c14a, transient=#58a6ff, lazy-only=#e8def8, factory=#ffe0b2, token=#d1d5db
-  %% Edge colors: eager=#6b7280, lazy=#a855f7, factory=#ef6c00
+  %% Legend: singleton=#3b6ea5, transient=#2a7d73, lazy-only=#6c5cb8, factory=#9c6516, token=#4b5c6b
+  %% Edge colors: eager=#7c93a6, lazy=#9385d6, factory=#c2922e
+  %% Edge labels: Si=singleton, Tr=transient, Tk=token; solid=eager, dotted=lazy
   id_AppService["AppService"]
-  style id_AppService fill:#f6c14a,stroke:#1f2937,color:#111827
+  style id_AppService fill:#3b6ea5,stroke:#5a7488,color:#ffffff
   id_Logger["Logger"]
-  style id_Logger fill:#f6c14a,stroke:#1f2937,color:#111827
+  style id_Logger fill:#3b6ea5,stroke:#5a7488,color:#ffffff
   id_HttpClient["HttpClient"]
-  style id_HttpClient fill:#58a6ff,stroke:#1f2937,color:#111827
+  style id_HttpClient fill:#2a7d73,stroke:#5a7488,color:#ffffff
   id_ReportService["ReportService"]
-  style id_ReportService fill:#e8def8,stroke:#1f2937,color:#111827
+  style id_ReportService fill:#6c5cb8,stroke:#5a7488,color:#ffffff
   token_ApiConfig["ApiConfig"]
-  style token_ApiConfig fill:#d1d5db,stroke:#1f2937,color:#111827
-  id_AppService -->|Eager · singleton→singleton · Class| id_Logger
-  id_AppService -->|Eager · singleton→transient · Class| id_HttpClient
-  id_AppService -.->|Lazy · singleton→singleton · Class| id_ReportService
-  id_HttpClient -->|Eager · transient→token · Token| token_ApiConfig
-  linkStyle 0 stroke:#6b7280,color:#6b7280
-  linkStyle 1 stroke:#6b7280,color:#6b7280
-  linkStyle 2 stroke:#a855f7,color:#a855f7
-  linkStyle 3 stroke:#6b7280,color:#6b7280
+  style token_ApiConfig fill:#4b5c6b,stroke:#5a7488,color:#ffffff
+  id_AppService -->|Si→Si| id_Logger
+  id_AppService -->|Si→Tr| id_HttpClient
+  id_AppService -.->|Si→Si| id_ReportService
+  id_HttpClient -->|Tr→Tk| token_ApiConfig
+  linkStyle 0 stroke:#7c93a6,color:#7c93a6
+  linkStyle 1 stroke:#7c93a6,color:#7c93a6
+  linkStyle 2 stroke:#9385d6,color:#9385d6
+  linkStyle 3 stroke:#7c93a6,color:#7c93a6
 ```
 
 At a glance you can read the **lifecycle** of every node, whether a dependency is
@@ -79,31 +80,34 @@ Each node is filled according to **how it's registered** in the container. The
 checks are applied in order, so a factory-backed or lazy-only service keeps its
 distinct color even if it also has a scope.
 
-| Fill  | Default   | Meaning                                               |
-| ----- | --------- | ----------------------------------------------------- |
-| Amber | `#f6c14a` | **Singleton** service                                 |
-| Blue  | `#58a6ff` | **Transient** service                                 |
-| Lilac | `#e8def8` | **Lazy-only** service (reachable solely via `Lazy()`) |
-| Peach | `#ffe0b2` | **Factory**-provided service                          |
-| Grey  | `#d1d5db` | **Token** — an identifier with no resolved provider   |
+| Fill       | Default   | Meaning                                               |
+| ---------- | --------- | ----------------------------------------------------- |
+| Steel-blue | `#3b6ea5` | **Singleton** service                                 |
+| Teal       | `#2a7d73` | **Transient** service                                 |
+| Violet     | `#6c5cb8` | **Lazy-only** service (reachable solely via `Lazy()`) |
+| Bronze     | `#9c6516` | **Factory**-provided service                          |
+| Slate      | `#4b5c6b` | **Token** — an identifier with no resolved provider   |
 
 ### Edges
 
-Edges point from a service to each of its dependencies:
+Edges point from a service to each of its dependencies. The **arrow style** tells
+you how the dependency is wired:
 
-- **Solid grey arrow** (`-->`) — an **eager** dependency, injected at construction.
-- **Dotted purple arrow** (`-.->`) — a **lazy** dependency, deferred behind `Lazy()` and code-split.
+- **Solid steel arrow** (`-->`) — an **eager** dependency, injected at construction.
+- **Dotted violet arrow** (`-.->`) — a **lazy** dependency, deferred behind `Lazy()` and code-split.
 
-Every edge is labelled with a compact summary:
+Each edge carries a compact **`source→target` scope** label so you can read the
+lifecycle transition without tracing colors:
 
-```
-Eager · singleton→transient · Class
-└────┘   └──────┘ └───────┘   └───┘
- nature   source    target    target
- of dep   scope     scope     kind
-```
+| Code | Scope     |
+| ---- | --------- |
+| `Si` | singleton |
+| `Tr` | transient |
+| `Tk` | token     |
 
-`target kind` is one of `Class`, `Factory`, or `Token`.
+For example, `Si→Tr` is a singleton depending on a transient. The dependency's
+eager/lazy nature is shown by the arrow style and the target's kind by its node
+color, so the label stays short.
 
 ## Rendering the `.mmd` file
 

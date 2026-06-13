@@ -61,6 +61,16 @@ watch([isDark, source], render);
   max-width: 100%;
   height: auto;
 }
+/* Give label text room so descenders (g/p) are never clipped. */
+.mermaid-diagram__canvas :deep(.nodeLabel),
+.mermaid-diagram__canvas :deep(.edgeLabel),
+.mermaid-diagram__canvas :deep(.messageText),
+.mermaid-diagram__canvas :deep(.actor tspan) {
+  line-height: 1.5;
+}
+.mermaid-diagram__canvas :deep(foreignObject) {
+  overflow: visible;
+}
 .mermaid-diagram__fallback {
   margin: 0;
   font-size: 12px;
