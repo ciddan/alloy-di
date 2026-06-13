@@ -133,6 +133,12 @@ h1.hero-headline,
 .alloy-landing .VPPage {
   background: var(--alloy-bg);
 }
+/* Contain the full-bleed hero's 100vw width without a horizontal scrollbar.
+ * `clip` (not `hidden`) avoids creating a scroll container that would break
+ * the sticky top nav. */
+.alloy-landing {
+  overflow-x: clip;
+}
 .alloy-home {
   max-width: 1152px;
   margin: 0 auto;
@@ -140,12 +146,14 @@ h1.hero-headline,
 }
 
 /* ---- HERO ---- */
+/* Full-bleed shell: the background/illustration and bottom border span the
+ * viewport, while inner content stays capped via .hero-grid below. */
 .alloy-hero {
   position: relative;
   overflow: hidden;
   border-bottom: 0.5px solid var(--alloy-border);
-  margin: 0 -24px;
-  padding: 0 24px;
+  margin-inline: calc(50% - 50vw);
+  padding: 0;
 }
 
 /* Layered backdrop: technical grid + steel glow + dependency graph */
@@ -262,7 +270,12 @@ h1.hero-headline,
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: center;
   gap: 48px;
-  padding: 80px 8px 72px;
+  /* Cap + center the content so it aligns with the rest of the page even
+   * though the hero shell is full-bleed. Side padding (24 + 8) preserves the
+   * pre-bleed gutter. */
+  max-width: 1152px;
+  margin-inline: auto;
+  padding: 80px 32px 72px;
 }
 
 .hero-eyebrow {
@@ -445,7 +458,9 @@ h1.hero-headline,
 }
 .alloy-divider-line {
   flex: 1;
-  height: 0.5px;
+  /* 1px, not 0.5px: a sub-pixel height rounds down to 0 device px at 100%
+   * zoom and the line disappears. */
+  height: 1px;
   background: var(--alloy-grid-line);
 }
 .alloy-divider-label {
@@ -591,7 +606,7 @@ h1.hero-headline,
   .hero-grid {
     grid-template-columns: 1fr;
     gap: 36px;
-    padding: 56px 0 48px;
+    padding: 56px 24px 48px;
   }
   .hero-code {
     max-width: 420px;

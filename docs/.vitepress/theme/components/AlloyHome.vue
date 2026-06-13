@@ -79,10 +79,20 @@ const features = [
   },
 ];
 
+// Quick-nav strip under the hero — wayfinding into the guides, deliberately a
+// different register from the feature cards (which pitch what Alloy is).
 const benefits = [
-  { num: "Zero", label: "Runtime reflection", link: "/guide/what-is-alloy" },
-  { num: "Lazy", label: "Code splitting", link: "/guide/lazy-loading" },
-  { num: "Mermaid", label: "Dependency graph", link: "/guide/visualization" },
+  {
+    num: "Setup",
+    label: "5-minute quickstart",
+    link: "/guide/getting-started",
+  },
+  { num: "Lazy", label: "Code-split services", link: "/guide/lazy-loading" },
+  {
+    num: "Graph",
+    label: "Inspect dependencies",
+    link: "/guide/visualization",
+  },
   { num: "Automock", label: "Test container", link: "/guide/testing" },
 ];
 </script>
@@ -187,6 +197,23 @@ const benefits = [
       </div>
     </section>
 
+    <!-- BENEFITS (quick-nav strip under the hero) -->
+    <div class="alloy-benefits">
+      <component
+        v-for="b in benefits"
+        :is="b.link ? 'a' : 'div'"
+        :key="b.label"
+        :href="b.link ? withBase(b.link) : undefined"
+        class="benefit"
+        :class="{ 'benefit--link': b.link }"
+      >
+        <div class="benefit-num">{{ b.num }}</div>
+        <div class="benefit-label">
+          {{ b.label }}<span v-if="b.link" class="benefit-arrow">→</span>
+        </div>
+      </component>
+    </div>
+
     <!-- DIVIDER -->
     <div class="alloy-divider">
       <span class="alloy-divider-line" />
@@ -251,23 +278,6 @@ const benefits = [
         <p class="feature-title">{{ f.title }}</p>
         <p class="feature-desc">{{ f.desc }}</p>
       </div>
-    </div>
-
-    <!-- BENEFITS -->
-    <div class="alloy-benefits">
-      <component
-        v-for="b in benefits"
-        :is="b.link ? 'a' : 'div'"
-        :key="b.label"
-        :href="b.link ? withBase(b.link) : undefined"
-        class="benefit"
-        :class="{ 'benefit--link': b.link }"
-      >
-        <div class="benefit-num">{{ b.num }}</div>
-        <div class="benefit-label">
-          {{ b.label }}<span v-if="b.link" class="benefit-arrow">→</span>
-        </div>
-      </component>
     </div>
   </div>
 </template>
