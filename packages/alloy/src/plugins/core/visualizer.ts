@@ -57,7 +57,7 @@ export interface MermaidDiagramArtifact {
   tokenCount: number;
 }
 
-const DEFAULT_SCOPE_COLORS: Record<ServiceScope, string> = {
+const DEFAULT_SCOPE_COLORS: Partial<Record<ServiceScope, string>> = {
   singleton: "#3b6ea5",
   transient: "#2a7d73",
 };

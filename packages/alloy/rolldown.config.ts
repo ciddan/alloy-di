@@ -33,6 +33,7 @@ export default defineConfig([
       rollup: "src/rollup.ts",
       runtime: "src/runtime.ts",
       test: "src/test.ts",
+      scopes: "src/scopes.ts",
     },
     tsconfig: "./tsconfig.json",
     output: {
