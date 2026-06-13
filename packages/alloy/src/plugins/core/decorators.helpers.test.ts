@@ -66,6 +66,36 @@ describe("extractServiceMetadata", () => {
     expect(meta.scope).toBe(ServiceScope.SINGLETON);
   });
 
+  it("preserves a custom scope string in the positional form", () => {
+    const { call, sourceFile } = getCallExpression("Injectable('session');");
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    expect(meta.scope).toBe("session");
+  });
+
+  it("preserves a custom scope passed positionally after deps", () => {
+    const { call, sourceFile } = getCallExpression(
+      "Injectable(() => [Dep], 'request');",
+    );
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    expect(meta.scope).toBe("request");
+    expect(meta.dependencies).toHaveLength(1);
+  });
+
+  it("preserves a custom scope in the object-literal form", () => {
+    const { call, sourceFile } = getCallExpression(
+      "Injectable({ scope: 'session', dependencies: () => [Dep] });",
+    );
+    const meta = extractServiceMetadata("Injectable", call, sourceFile);
+    expect(meta.scope).toBe("session");
+    expect(meta.dependencies).toHaveLength(1);
+  });
+
+  it("ignores a custom scope string for the Singleton decorator", () => {
+    const { call, sourceFile } = getCallExpression("Singleton('session');");
+    const meta = extractServiceMetadata("Singleton", call, sourceFile);
+    expect(meta.scope).toBe(ServiceScope.SINGLETON);
+  });
+
   it("parses function dependency list", () => {
     const { call, sourceFile } = getCallExpression("Injectable(() => [Dep]);");
     const meta = extractServiceMetadata("Injectable", call, sourceFile);

@@ -2,7 +2,7 @@ import { Constructor, Newable, Token, isConstructor, isToken } from "./types";
 import { Lazy, isLazy } from "./lazy";
 import { dependenciesRegistry } from "./decorators";
 import { DependencyResolutionError } from "./dependency-error";
-import { ServiceScope } from "./scope";
+import { ServiceScope, ResolutionContext } from "./scope";
 import {
   ServiceIdentifier,
   getConstructorByIdentifier,
@@ -65,7 +65,7 @@ function formatFactoryLazyWarning(target: Constructor): string {
  * It stores metadata discovered at build time, resolves constructor dependencies,
  * performs singleton caching, and supports token-based value providers.
  */
-export class Container {
+export class Container implements ResolutionContext {
   private readonly singletons = new Map<Constructor, unknown>();
   private readonly pendingSingletons = new Map<Constructor, Promise<unknown>>();
   // Instance-level overrides for tests: when present, resolution returns the provided instance
@@ -73,6 +73,39 @@ export class Container {
   private readonly metadataCache = new Map<Constructor, ServiceMetadata>();
   private readonly valueProviders = new Map<symbol, unknown>();
   private readonly factoryWarningCache = new WeakSet<Constructor>();
+  private readonly scopeHierarchy = new Map<ServiceScope, ServiceScope>();
+
+  // ResolutionContext implementation
+  public readonly scopeName: ServiceScope = ServiceScope.SINGLETON;
+  public readonly parent: ResolutionContext | null = null;
+
+  public getCached(target: Constructor): unknown {
+    return this.singletons.get(target);
+  }
+
+  public setCached(target: Constructor, instance: unknown): void {
+    this.singletons.set(target, instance);
+  }
+
+  public getPending(target: Constructor): Promise<unknown> | undefined {
+    return this.pendingSingletons.get(target);
+  }
+
+  public setPending(target: Constructor, promise: Promise<unknown>): void {
+    this.pendingSingletons.set(target, promise);
+  }
+
+  public deletePending(target: Constructor): void {
+    this.pendingSingletons.delete(target);
+  }
+
+  public getProvider(tokenId: symbol): unknown {
+    return this.valueProviders.get(tokenId);
+  }
+
+  public hasProvider(tokenId: symbol): boolean {
+    return this.valueProviders.has(tokenId);
+  }
 
   /**
    * Resolve (and construct) the requested service.
@@ -88,7 +121,49 @@ export class Container {
     if (typeof targetOrIdentifier === "symbol") {
       return this.getByIdentifier(targetOrIdentifier);
     }
-    return this.getByConstructor(targetOrIdentifier);
+    return this.getByConstructor(targetOrIdentifier, this);
+  }
+
+  /** @internal */
+  public _registerScopeHierarchy(hierarchy: Record<string, string>): void {
+    for (const [child, parent] of Object.entries(hierarchy)) {
+      // oxlint-disable-next-line no-unsafe-type-assertion -- Justified: Configured scope hierarchy entries are validated at build time.
+      this.scopeHierarchy.set(child as ServiceScope, parent as ServiceScope);
+    }
+  }
+
+  /** @internal */
+  public _validateScopeParent(
+    childScope: ServiceScope,
+    parentScope: ServiceScope,
+  ): void {
+    const declaredParent = this.scopeHierarchy.get(childScope);
+    if (declaredParent && declaredParent !== parentScope) {
+      throw new Error(
+        `[alloy] Invalid scope hierarchy construction: scope '${String(childScope)}' is declared with parent '${String(declaredParent)}', but was constructed with parent scope '${String(parentScope)}'.`,
+      );
+    }
+  }
+
+  /** @internal */
+  public async _resolveInContext<T>(
+    target: Newable<T> | ServiceIdentifier<T>,
+    context: ResolutionContext,
+    options?: { skipFactoryWarning?: boolean },
+  ): Promise<T> {
+    if (typeof target === "symbol") {
+      const ctor = getConstructorByIdentifier(target);
+      if (!ctor) {
+        throw new Error(
+          `No service registered for identifier ${target.description ?? target.toString()}`,
+        );
+      }
+      // oxlint-disable-next-line no-unsafe-type-assertion -- Justified: ctor retrieved from safe registry matches target constructor type.
+      return this.getByConstructor(ctor as Newable<T>, context, {
+        skipFactoryWarning: true,
+      });
+    }
+    return this.getByConstructor(target, context, options);
   }
 
   /**
@@ -123,7 +198,7 @@ export class Container {
       );
     }
     // oxlint-disable-next-line no-unsafe-type-assertion
-    return this.getByConstructor(ctor as Newable<T>, {
+    return this.getByConstructor(ctor as Newable<T>, this, {
       skipFactoryWarning: true,
     });
   }
@@ -154,12 +229,13 @@ export class Container {
 
   private async getByConstructor<T>(
     target: Newable<T>,
+    context: ResolutionContext,
     options?: { skipFactoryWarning?: boolean },
   ): Promise<T> {
     if (!options?.skipFactoryWarning) {
       this.maybeWarnFactoryLazyConstructorUsage(target);
     }
-    return this.resolve(target, []);
+    return this.resolve(target, [], context);
   }
 
   private maybeWarnFactoryLazyConstructorUsage(target: Constructor): void {
@@ -193,6 +269,7 @@ export class Container {
   private async resolve<T>(
     target: Newable<T>,
     resolutionStack: Constructor[],
+    context: ResolutionContext,
   ): Promise<T> {
     // Instance override fast path (test/mocking support)
     const overridden = this.instanceOverrides.get(target);
@@ -218,33 +295,77 @@ export class Container {
     const metadata = this.getServiceMetadata(target);
     const nextStack = [...resolutionStack, target];
 
+    const targetCtx = this.findContextForScope(metadata.scope, context);
+
     if (metadata.scope === ServiceScope.SINGLETON) {
-      return this.resolveSingleton(target, metadata, nextStack);
+      return this.resolveCached(target, metadata, nextStack, targetCtx);
     }
 
+    if (metadata.scope === ServiceScope.TRANSIENT) {
+      return this.createInstance(
+        target,
+        metadata.dependencies,
+        nextStack,
+        metadata.factory,
+        targetCtx,
+      );
+    }
+
+    // Custom scope
+    if (targetCtx.scopeName === metadata.scope) {
+      return this.resolveCached(target, metadata, nextStack, targetCtx);
+    }
+
+    // Fallback for custom scope (treated as transient on targetCtx)
     return this.createInstance(
       target,
       metadata.dependencies,
       nextStack,
       metadata.factory,
+      targetCtx,
     );
   }
 
-  /**
-   * Resolve a singleton service with caching and in-flight creation coalescing.
-   */
-  private async resolveSingleton<T>(
+  private findContextForScope(
+    scope: ServiceScope,
+    startingContext: ResolutionContext,
+  ): ResolutionContext {
+    if (scope === ServiceScope.SINGLETON) {
+      let current = startingContext;
+      while (current.parent) {
+        current = current.parent;
+      }
+      return current;
+    }
+
+    if (scope === ServiceScope.TRANSIENT) {
+      return startingContext;
+    }
+
+    let current: ResolutionContext | null = startingContext;
+    while (current) {
+      if (current.scopeName === scope) {
+        return current;
+      }
+      current = current.parent;
+    }
+
+    return startingContext;
+  }
+
+  private async resolveCached<T>(
     target: Newable<T>,
     metadata: ServiceMetadata,
     resolutionStack: Constructor[],
+    targetCtx: ResolutionContext,
   ): Promise<T> {
-    const cached = this.singletons.get(target);
+    const cached = targetCtx.getCached(target);
     if (cached) {
       // oxlint-disable-next-line no-unsafe-type-assertion
       return cached as T;
     }
 
-    const pending = this.pendingSingletons.get(target);
+    const pending = targetCtx.getPending(target);
     if (pending) {
       // oxlint-disable-next-line no-unsafe-type-assertion
       return (await pending) as T;
@@ -255,18 +376,19 @@ export class Container {
       metadata.dependencies,
       resolutionStack,
       metadata.factory,
+      targetCtx,
     ).then((instance) => {
-      this.singletons.set(target, instance);
+      targetCtx.setCached(target, instance);
       return instance;
     });
 
-    this.pendingSingletons.set(target, creation);
+    targetCtx.setPending(target, creation);
 
     try {
       // oxlint-disable-next-line no-unsafe-type-assertion
       return (await creation) as T;
     } finally {
-      this.pendingSingletons.delete(target);
+      targetCtx.deletePending(target);
     }
   }
 
@@ -284,7 +406,8 @@ export class Container {
     target: Newable<T>,
     dependencies: readonly (Constructor | Lazy<unknown> | Token<unknown>)[],
     resolutionStack: Constructor[],
-    factory?: Lazy<Constructor>,
+    factory: Lazy<Constructor> | undefined,
+    context: ResolutionContext,
   ): Promise<T> {
     // If this is a factory-lazy service, import the real class
     const ctor = factory
@@ -294,7 +417,7 @@ export class Container {
     // Resolve all dependencies in parallel
     const paramInstances = await Promise.all(
       dependencies.map((param) =>
-        this.resolveParam(param, ctor, resolutionStack),
+        this.resolveParam(param, ctor, resolutionStack, context),
       ),
     );
 
@@ -318,6 +441,7 @@ export class Container {
     param: unknown,
     target: Constructor,
     resolutionStack: Constructor[],
+    context: ResolutionContext,
   ): Promise<unknown> {
     const classification = classifyDependency(param);
     if (!classification) {
@@ -339,18 +463,24 @@ export class Container {
           target,
           resolutionStack,
         );
-        return this.resolve(depClass as Newable<unknown>, resolutionStack);
+        return this.resolve(
+          depClass as Newable<unknown>,
+          resolutionStack,
+          context,
+        );
       }
       case "token":
         return this.resolveTokenLike(
           classification.token,
           target,
           resolutionStack,
+          context,
         );
       case "constructor":
         return this.resolve(
           classification.ctor as Newable<unknown>,
           resolutionStack,
+          context,
         );
     }
     const unreachable: never = classification;
@@ -450,10 +580,16 @@ export class Container {
     tok: { id: symbol; description?: string },
     target: Constructor,
     resolutionStack: Constructor[],
+    context: ResolutionContext,
   ): unknown {
-    if (this.valueProviders.has(tok.id)) {
-      return this.valueProviders.get(tok.id);
+    let current: ResolutionContext | null = context;
+    while (current) {
+      if (current.hasProvider(tok.id)) {
+        return current.getProvider(tok.id);
+      }
+      current = current.parent;
     }
+
     const stackPath = this.formatStackPath(target, resolutionStack);
     throw new DependencyResolutionError(
       `No provider registered for token ${tok.description ?? String(tok.id)} while resolving ${target.name}. Resolution stack: ${stackPath}`,

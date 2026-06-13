@@ -21,12 +21,17 @@
     "README.md"
   ],
   "type": "module",
+  "sideEffects": false,
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     "./runtime": {
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js"
+    },
+    "./scopes": {
+      "types": "./dist/scopes.d.ts",
+      "import": "./dist/scopes.js"
     },
     "./vite": {
       "types": "./dist/vite.d.ts",

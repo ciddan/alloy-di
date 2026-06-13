@@ -8,6 +8,10 @@ import {
 } from "./build-utils";
 import { createDiscoveryStore } from "../core/discovery-store";
 import { ServiceScope } from "../../lib/scope";
+import {
+  validateScopeStability,
+  validateScopesConfig,
+} from "../core/scopes-validation";
 import type {
   ManifestServiceDescriptor,
   ManifestServiceDescriptorV2,
@@ -88,6 +92,14 @@ export function alloy(
 
     generateBundle(outputOptions: unknown) {
       const buildMode = getBuildMode(outputOptions);
+
+      // Scope-stability validation is opt-in: it runs only when custom scopes
+      // are declared, leaving non-scoped library builds unchanged.
+      if (options.scopes && Object.keys(options.scopes).length > 0) {
+        validateScopesConfig(options.scopes);
+        const allMetas = [...discovery.fileMetas.values()].flat();
+        validateScopeStability(allMetas, options.scopes);
+      }
 
       const services: ManifestServiceDescriptorV2[] = [];
       const missingExports: string[] = [];

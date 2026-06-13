@@ -3,6 +3,7 @@ import {
   GENERATED_FILE_HEADER,
   generateContainerModule,
   generateContainerTypeDefinition,
+  generateScopeAugmentationDefinition,
   generateManifestTypeDefinition,
   __codegenInternals,
   type ResolvedRegistration,
@@ -369,6 +370,53 @@ describe("codegen local name collisions (issue #17)", () => {
     const coreImports = code.match(/import \{ Core[^\n]*/g) ?? [];
     expect(coreImports).toEqual(["import { Core } from '/src/core.ts';"]);
     expect(code).toContain("dependencies: () => [Core]");
+  });
+});
+
+describe("custom scope code generation", () => {
+  const meta = {
+    className: "Svc",
+    filePath: "/src/svc.ts",
+    metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+  };
+
+  it("emits a scope-hierarchy registration when scopes are configured", () => {
+    const code = generateContainerModule([meta], new Set(), [], {
+      scopes: {
+        session: { parent: "singleton" },
+        request: { parent: "session" },
+      },
+    });
+    expect(code).toContain("container._registerScopeHierarchy({");
+    expect(code).toContain('"session": "singleton"');
+    expect(code).toContain('"request": "session"');
+  });
+
+  it("emits no scope registration when no scopes are configured", () => {
+    const code = generateContainerModule([meta], new Set(), []);
+    expect(code).not.toContain("_registerScopeHierarchy");
+  });
+
+  it("emits the AlloyScopes augmentation as a standalone module file", () => {
+    const dts = generateScopeAugmentationDefinition(["session", "request"]);
+    expect(dts).toBeDefined();
+    expect(dts).toContain('declare module "alloy-di/runtime"');
+    expect(dts).toContain("interface AlloyScopes");
+    expect(dts).toContain('"session": true;');
+    expect(dts).toContain('"request": true;');
+    // Must be a module (augmentation) — hence the trailing export.
+    expect(dts).toContain("export {};");
+  });
+
+  it("returns undefined when there are no custom scopes", () => {
+    expect(generateScopeAugmentationDefinition([])).toBeUndefined();
+  });
+
+  it("keeps the container declaration a global script (no top-level export)", () => {
+    const dts = generateContainerTypeDefinition([], (p) => p);
+    expect(dts).toContain('declare module "virtual:alloy-container"');
+    expect(dts).not.toContain('declare module "alloy-di/runtime"');
+    expect(dts).not.toContain("export {};");
   });
 });
 

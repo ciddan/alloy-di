@@ -1,4 +1,10 @@
-import type { ServiceScope } from "../../lib/scope";
+/**
+ * Build-time scope name. Unlike the runtime `ServiceScope` (a closed union of
+ * the two built-ins within the library's own compilation), discovered metadata
+ * may carry arbitrary, application-defined custom scope names (e.g. `session`,
+ * `request`) which are validated against the plugin `scopes` config.
+ */
+export type BuildScope = string;
 
 export interface DependencyDescriptor {
   /** The source code expression for this dependency */
@@ -12,7 +18,7 @@ export interface DependencyDescriptor {
 }
 
 export interface ServiceMetadata {
-  scope: ServiceScope;
+  scope: BuildScope;
   dependencies: DependencyDescriptor[];
   factory?: DependencyDescriptor;
 }
@@ -67,7 +73,7 @@ export interface ManifestServiceDescriptorBase {
    * Format: `alloy:<package-name>/<relative-path>#<ClassName>`
    */
   symbolKey: string;
-  scope: ServiceScope;
+  scope: BuildScope;
 }
 
 export interface ManifestServiceDescriptorV1 extends ManifestServiceDescriptorBase {

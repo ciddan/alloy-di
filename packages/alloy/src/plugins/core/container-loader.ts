@@ -5,6 +5,7 @@ import {
   generateContainerModule,
   generateContainerTypeDefinition,
   generateManifestTypeDefinition,
+  generateScopeAugmentationDefinition,
 } from "./codegen";
 import type { AlloyManifest, DiscoveredMeta } from "./types";
 import { normalizeImportPath, writeFileIfChanged } from "./utils";
@@ -19,6 +20,11 @@ import {
   toMetaFromManifest,
 } from "./manifest-utils";
 import { generateMermaidDiagram } from "./visualizer";
+import {
+  validateScopeStability,
+  validateScopesConfig,
+  type AlloyScopesConfig,
+} from "./scopes-validation";
 import {
   ensureDirectoryForFile,
   type ResolvedVisualizationOptions,
@@ -36,6 +42,8 @@ export interface LoadVirtualContainerOptions {
   resolvedVisualization: ResolvedVisualizationOptions | null;
   /** Bundler-resolved mode, injected into the generated module when known. */
   isDevMode?: boolean;
+  /** Declared custom scope hierarchy (names + parent ordering). */
+  scopes?: AlloyScopesConfig;
 }
 
 export async function loadVirtualContainerModule(
@@ -78,8 +86,17 @@ export async function loadVirtualContainerModule(
   reconcileLazySet(metas, lazyClassKeys, eagerReferencedNames);
   augmentFactoryLazyServices(metas, options.lazyServiceKeys);
 
+  // Scope-stability validation is opt-in: it runs only when custom scopes are
+  // declared. Projects without a `scopes` config keep today's behavior exactly
+  // (e.g. a singleton may freely depend on a transient).
+  if (options.scopes && Object.keys(options.scopes).length > 0) {
+    validateScopesConfig(options.scopes);
+    validateScopeStability(metas, options.scopes);
+  }
+
   const code = generateContainerModule(metas, lazyClassKeys, providerImports, {
     isDev: options.isDevMode,
+    scopes: options.scopes,
   });
 
   writeTypeDefinitions(
@@ -87,12 +104,14 @@ export async function loadVirtualContainerModule(
     loadedManifests,
     options.resolvedRoot,
     options.containerDeclarationDir,
+    options.scopes,
   );
 
   writeVisualizationArtifact(
     metas,
     lazyClassKeys,
     options.resolvedVisualization,
+    options.scopes,
   );
 
   return { code, moduleType: "js" };
@@ -164,6 +183,7 @@ function writeTypeDefinitions(
   loadedManifests: Awaited<ReturnType<typeof readManifests>>["loadedManifests"],
   resolvedRoot: string,
   containerDeclarationDir: string | undefined,
+  scopes: AlloyScopesConfig | undefined,
 ): void {
   const dtsDir = path.resolve(resolvedRoot, containerDeclarationDir ?? "./src");
   const dtsContent = generateContainerTypeDefinition(metas, (filePath) =>
@@ -175,6 +195,20 @@ function writeTypeDefinitions(
   }
 
   writeFileIfChanged(path.join(dtsDir, "alloy-container.d.ts"), dtsContent);
+
+  // The AlloyScopes augmentation lives in its own file: it must be a module
+  // (module augmentation), while the container declaration must remain a global
+  // script so `virtual:alloy-container` resolves everywhere.
+  const scopeAugmentationPath = path.join(dtsDir, "alloy-scopes.d.ts");
+  const scopeAugmentation = generateScopeAugmentationDefinition(
+    scopes ? Object.keys(scopes) : [],
+  );
+  if (scopeAugmentation) {
+    writeFileIfChanged(scopeAugmentationPath, scopeAugmentation);
+  } else if (fs.existsSync(scopeAugmentationPath)) {
+    // Remove a stale augmentation when scopes are no longer configured.
+    fs.rmSync(scopeAugmentationPath);
+  }
 
   if (loadedManifests.length === 0) {
     return;
@@ -210,6 +244,7 @@ function writeVisualizationArtifact(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
   resolvedVisualization: ResolvedVisualizationOptions | null,
+  scopes: AlloyScopesConfig | undefined,
 ): void {
   if (!resolvedVisualization) {
     return;
@@ -219,6 +254,7 @@ function writeVisualizationArtifact(
     metas,
     lazyClassKeys: new Set(lazyReferencedClassKeys),
     options: resolvedVisualization.mermaidOptions,
+    scopes,
   });
   ensureDirectoryForFile(resolvedVisualization.outputPath);
   writeFileIfChanged(

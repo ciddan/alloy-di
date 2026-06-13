@@ -7,6 +7,7 @@ import {
   createSymbolKey,
 } from "./utils";
 import type { DiscoveredMeta, DependencyDescriptor } from "./types";
+import type { AlloyScopesConfig } from "./scopes-validation";
 import { IdentifierResolver } from "./identifier-resolver";
 
 export interface ResolvedRegistration extends DiscoveredMeta {
@@ -645,6 +646,33 @@ export const __codegenInternals = {
 
 export interface GenerateContainerModuleOptions {
   isDev?: boolean;
+  /** Declared custom scope hierarchy; emitted as a runtime registration. */
+  scopes?: AlloyScopesConfig;
+}
+
+/**
+ * Builds the runtime scope-hierarchy registration statement. The generated
+ * container records the declared parent of each custom scope so child scopes
+ * constructed via `alloy-di/scopes` can be validated against the build-time
+ * hierarchy. Returns an empty string when no custom scopes are configured.
+ */
+function createScopeHierarchyBlock(
+  scopes: AlloyScopesConfig | undefined,
+): string {
+  if (!scopes) {
+    return "";
+  }
+  const names = Object.keys(scopes);
+  if (!names.length) {
+    return "";
+  }
+  const entries = names
+    .map(
+      (name) =>
+        `  ${JSON.stringify(name)}: ${JSON.stringify(scopes[name].parent ?? "singleton")}`,
+    )
+    .join(",\n");
+  return `\ncontainer._registerScopeHierarchy({\n${entries}\n});\n`;
 }
 
 /**
@@ -685,6 +713,8 @@ export function generateContainerModule(
       ? ""
       : `\nsetEnvDetectionOverrides({ isDev: ${options.isDev} });\n`;
 
+  const scopeHierarchyBlock = createScopeHierarchyBlock(options?.scopes);
+
   let providerImportBlock = "";
   let providerInvocationBlock = "";
 
@@ -705,7 +735,7 @@ ${providerImportBlock}
 ${registrationsBlock}
 
 const container = new Container();
-
+${scopeHierarchyBlock}
 for (const entry of registrations) {
   dependenciesRegistry.set(entry.ctor, entry.meta);
 }
@@ -780,6 +810,37 @@ declare module "virtual:alloy-container" {
   const container: Container;
   export default container;
 }
+`;
+}
+
+/**
+ * Generates a standalone declaration file that augments `AlloyScopes` with the
+ * custom scope names, opening the `ServiceScope` union so `@Injectable('<scope>')`
+ * type-checks. Returns `undefined` when no custom scopes are configured.
+ *
+ * This MUST live in its own file: module augmentation requires the file to be a
+ * module (hence the trailing `export {}`), whereas the container declaration
+ * must stay a global script so `virtual:alloy-container` resolves everywhere.
+ * Combining the two in one file turns the container declaration into a module
+ * and breaks resolution of the virtual module.
+ */
+export function generateScopeAugmentationDefinition(
+  scopeNames: string[],
+): string | undefined {
+  if (!scopeNames.length) {
+    return undefined;
+  }
+  const members = scopeNames
+    .map((name) => `    ${JSON.stringify(name)}: true;`)
+    .join("\n");
+  return `${GENERATED_FILE_HEADER}
+declare module "alloy-di/runtime" {
+  interface AlloyScopes {
+${members}
+  }
+}
+
+export {};
 `;
 }
 

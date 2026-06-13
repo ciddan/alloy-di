@@ -82,6 +82,58 @@ describe("Vite Plugin Alloy - module generation", () => {
     );
   });
 
+  describe("custom scopes", () => {
+    const session = `
+      import { Injectable } from 'alloy-di/runtime';
+      @Injectable('session')
+      export class UserSession {}
+    `;
+
+    it("registers the scope hierarchy in the generated module", async () => {
+      const plugin = alloy({
+        scopes: {
+          session: { parent: "singleton" },
+          request: { parent: "session" },
+        },
+      });
+      applyTransform(plugin, session, "/src/user-session.ts");
+      const code = (await loadContainer(
+        plugin,
+        "\0virtual:alloy-container",
+      )) as string;
+      expect(code).toContain("container._registerScopeHierarchy({");
+      expect(code).toContain('"session": "singleton"');
+    });
+
+    it("throws a build error on a scope-stability violation", async () => {
+      const plugin = alloy({
+        scopes: { session: { parent: "singleton" } },
+      });
+      const captive = `
+        import { Injectable } from 'alloy-di/runtime';
+        import { UserSession } from './user-session';
+        @Injectable(() => [UserSession], 'singleton')
+        export class AppService {}
+      `;
+      applyTransform(plugin, session, "/src/user-session.ts");
+      applyTransform(plugin, captive, "/src/app-service.ts");
+
+      await expect(
+        loadContainer(plugin, "\0virtual:alloy-container"),
+      ).rejects.toThrow(/Scope stability violation/);
+    });
+
+    it("throws on an invalid scopes config (unknown parent)", async () => {
+      const plugin = alloy({
+        scopes: { request: { parent: "sesion" } },
+      });
+      applyTransform(plugin, session, "/src/user-session.ts");
+      await expect(
+        loadContainer(plugin, "\0virtual:alloy-container"),
+      ).rejects.toThrow(/unknown parent 'sesion'/);
+    });
+  });
+
   it("treats a service as lazy-only after its eager reference is removed", async () => {
     const plugin = alloy();
     const core = `
