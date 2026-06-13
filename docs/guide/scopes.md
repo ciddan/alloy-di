@@ -75,7 +75,7 @@ export class RequestLogger {
 
 ### Type Safety for Scope Names
 
-To ensure you don't make typos like `@Injectable("sesion")`, the build plugin automatically generates a module augmentation in your generated container declaration (`alloy-container.d.ts`):
+To ensure you don't make typos like `@Injectable("sesion")`, the build plugin automatically generates a module augmentation in a dedicated declaration file (`alloy-scopes.d.ts`, emitted alongside `alloy-container.d.ts` in your [`containerDeclarationDir`](/config/vite-plugin#containerdeclarationdir)):
 
 ```typescript
 // GENERATED — do not edit

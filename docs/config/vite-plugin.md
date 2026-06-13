@@ -74,14 +74,39 @@ alloy({
 - **Type:** `string`
 - **Default:** `"./src"`
 
-Directory where the type declaration files (`alloy-container.d.ts` and `alloy-manifests.d.ts`) for the virtual module should be generated.
+Directory where the type declaration files (`alloy-container.d.ts` and `alloy-manifests.d.ts`) for the virtual module should be generated. When [custom scopes](/guide/scopes) are configured, an `alloy-scopes.d.ts` file is also emitted here.
 
 These files provide TypeScript support for:
 
 1. `virtual:alloy-container` module imports.
 2. `serviceIdentifiers` type safety.
+3. Custom scope name type-checking (via `alloy-scopes.d.ts`).
 
 Relative paths are resolved against the project root.
+
+### scopes
+
+- **Type:** `Record<string, { parent: string }>`
+- **Default:** `{}`
+
+Declares custom, application-defined [hierarchical scopes](/guide/scopes) (lifecycles that sit between `singleton` and `transient`, such as `session` or `request`). Each entry names a scope and its `parent` — either `"singleton"` or another declared scope — establishing the lifecycle lattice.
+
+```typescript
+alloy({
+  scopes: {
+    session: { parent: "singleton" },
+    request: { parent: "session" },
+  },
+});
+```
+
+This single declaration drives three things at build time:
+
+1. **Type-safe scope names** — the names are emitted into a generated `alloy-scopes.d.ts` so `@Injectable("session")` type-checks and typos are caught.
+2. **Scope-stability validation** — a longer-lived service depending on a shorter-lived one (a captive dependency) becomes a build error.
+3. **Runtime hierarchy registration** — the parent ordering is baked into the generated container so child scopes can be validated against it.
+
+Scope-stability validation only runs when this option is set, so projects without custom scopes are unaffected. See the [Hierarchical Scopes guide](/guide/scopes) for the full model.
 
 ### visualize
 
