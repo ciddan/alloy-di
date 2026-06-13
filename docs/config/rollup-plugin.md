@@ -40,12 +40,12 @@ Path to the `package.json` file. The plugin reads this to determine the package 
 - **Type:** `Record<string, { parent: string }>`
 - **Default:** `{}`
 
-Declares custom [hierarchical scopes](/guide/scopes) and their parent ordering for the library's own services. Each entry names a scope and its `parent` — either `"singleton"` or another declared scope.
+Declares custom [hierarchical scopes](/guide/scopes) and their parent ordering for the library's own services. Each entry names a scope and its `parent` — either `"singleton"` or another declared scope. `parent` defaults to `"singleton"` when omitted.
 
 ```typescript
 alloy({
   scopes: {
-    session: { parent: "singleton" },
+    session: {}, // parent defaults to "singleton"
     request: { parent: "session" },
   },
 });

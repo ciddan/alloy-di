@@ -89,12 +89,12 @@ Relative paths are resolved against the project root.
 - **Type:** `Record<string, { parent: string }>`
 - **Default:** `{}`
 
-Declares custom, application-defined [hierarchical scopes](/guide/scopes) (lifecycles that sit between `singleton` and `transient`, such as `session` or `request`). Each entry names a scope and its `parent` — either `"singleton"` or another declared scope — establishing the lifecycle lattice.
+Declares custom, application-defined [hierarchical scopes](/guide/scopes) (lifecycles that sit between `singleton` and `transient`, such as `session` or `request`). Each entry names a scope and its `parent` — either `"singleton"` or another declared scope — establishing the lifecycle lattice. `parent` defaults to `"singleton"` when omitted.
 
 ```typescript
 alloy({
   scopes: {
-    session: { parent: "singleton" },
+    session: {}, // parent defaults to "singleton"
     request: { parent: "session" },
   },
 });

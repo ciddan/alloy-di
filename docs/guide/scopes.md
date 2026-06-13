@@ -39,7 +39,7 @@ export default defineConfig({
   plugins: [
     alloy({
       scopes: {
-        session: { parent: "singleton" },
+        session: {}, // parent defaults to "singleton"
         request: { parent: "session" },
       },
     }),
@@ -47,7 +47,7 @@ export default defineConfig({
 });
 ```
 
-`singleton` is the implicit root, and `transient` is the implicit leaf, so neither needs to be declared.
+`singleton` is the implicit root, and `transient` is the implicit leaf, so neither needs to be declared. `parent` defaults to `"singleton"` when omitted, so a top-level scope can be declared as `session: {}`.
 
 This single source of truth drives:
 
