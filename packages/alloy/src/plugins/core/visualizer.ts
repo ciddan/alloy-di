@@ -294,11 +294,13 @@ function escapeMermaidLabel(label: string): string {
   return label.replaceAll('"', '\\"').replaceAll("|", "/");
 }
 
-const SCOPE_ABBREVIATIONS: Record<string, string> = {
-  singleton: "Si",
-  transient: "Tr",
-  token: "Tk",
-};
+/** Single-token code for a node's scope/kind: Si, Tr, or Tk (token). */
+function scopeCode(node: GraphNode): string {
+  if (node.type === "token") {
+    return "Tk";
+  }
+  return node.scope === "transient" ? "Tr" : "Si";
+}
 
 /**
  * Builds a compact edge label as a `source→target` scope transition (e.g.
@@ -306,10 +308,7 @@ const SCOPE_ABBREVIATIONS: Record<string, string> = {
  * node color, so they are intentionally omitted from the text. See the legend.
  */
 function describeEdge(from: GraphNode, to: GraphNode): string {
-  const fromScope = SCOPE_ABBREVIATIONS[from.scope ?? ""] ?? "?";
-  const toKey = to.type === "token" ? "token" : (to.scope ?? "");
-  const toScope = SCOPE_ABBREVIATIONS[toKey] ?? "?";
-  return `${fromScope}→${toScope}`;
+  return `${scopeCode(from)}→${scopeCode(to)}`;
 }
 
 /**
