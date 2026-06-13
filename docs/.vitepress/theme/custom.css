@@ -291,28 +291,72 @@ h1.hero-headline,
   padding: 80px 32px 72px;
 }
 
-.hero-eyebrow {
+/* ---- PILL (shared eyebrow / category tag) ---- */
+.pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   font-family: var(--alloy-font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--alloy-accent);
-  letter-spacing: 0.12em;
   text-transform: uppercase;
-  border: 0.5px solid var(--alloy-accent-border);
-  padding: 5px 11px;
+  color: var(--pill);
+  border: 0.5px solid color-mix(in srgb, var(--pill) 40%, transparent);
+  background: color-mix(in srgb, var(--pill) 10%, transparent);
   border-radius: 4px;
-  margin-bottom: 26px;
-  background: var(--alloy-accent-soft);
 }
-.hero-eyebrow-dot {
+.pill-icon {
+  flex: none;
+}
+.pill-dot {
+  flex: none;
   width: 6px;
   height: 6px;
-  background: var(--alloy-accent);
   border-radius: 50%;
-  box-shadow: 0 0 8px var(--alloy-accent);
+  background: var(--pill);
+  box-shadow: 0 0 8px var(--pill);
+}
+/* hue */
+.pill--accent {
+  --pill: var(--alloy-accent);
+}
+.pill--blue {
+  --pill: var(--alloy-c-blue);
+}
+.pill--teal {
+  --pill: var(--alloy-c-teal);
+}
+.pill--amber {
+  --pill: var(--alloy-c-amber);
+}
+.pill--violet {
+  --pill: var(--alloy-c-violet);
+}
+/* size */
+.pill--sm {
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  padding: 3px 7px 3px 6px;
+}
+.pill--sm .pill-icon {
+  width: 12px;
+  height: 12px;
+}
+.pill--md {
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  padding: 5px 11px;
+}
+.pill--md .pill-icon {
+  width: 14px;
+  height: 14px;
+}
+/* contextual spacing */
+.hero-content .pill {
+  margin-bottom: 26px;
+}
+.feature-body .pill {
+  margin-bottom: 14px;
 }
 
 .hero-headline {
@@ -568,25 +612,6 @@ h1.hero-headline,
   flex: 1;
   min-width: 0;
   padding: 26px 24px;
-}
-.feature-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 14px;
-  font-family: var(--alloy-font-mono);
-  font-size: 10px;
-  color: var(--fc);
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  border: 0.5px solid color-mix(in srgb, var(--fc) 40%, transparent);
-  padding: 3px 7px 3px 6px;
-  border-radius: 3px;
-}
-.feature-tag-icon {
-  width: 12px;
-  height: 12px;
-  flex: none;
 }
 .feature-title {
   font-family: var(--alloy-font-display);
