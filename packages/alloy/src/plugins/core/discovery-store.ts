@@ -6,10 +6,14 @@
 
 import crypto from "node:crypto";
 import { scanSource } from "./scanner";
-import type { DiscoveredMeta } from "./types";
+import type { DiscoveredMeta, FactoryProviderMeta } from "./types";
 
 function hashContent(code: string): string {
   return crypto.createHash("sha1").update(code).digest("hex");
+}
+
+export interface DiscoveryStoreUpdateOptions {
+  factoryProviders?: boolean;
 }
 
 export interface DiscoveryStoreOptions {
@@ -19,20 +23,28 @@ export interface DiscoveryStoreOptions {
 export interface DiscoveryStoreUpdate {
   metas: DiscoveredMeta[];
   lazyClassKeys: Set<string>;
+  factoryProviders: FactoryProviderMeta[];
   previousMetas?: DiscoveredMeta[];
   previousLazyClassKeys?: Set<string>;
+  previousFactoryProviders?: FactoryProviderMeta[];
 }
 
 export interface DiscoveryStoreRemoval {
   previousMetas?: DiscoveredMeta[];
   previousLazyClassKeys?: Set<string>;
+  previousFactoryProviders?: FactoryProviderMeta[];
 }
 
 export interface DiscoveryStore {
   readonly fileMetas: Map<string, DiscoveredMeta[]>;
   readonly fileLazyRefs: Map<string, Set<string>>;
+  readonly fileFactoryProviders: Map<string, FactoryProviderMeta[]>;
   readonly fileSources?: Map<string, string>;
-  updateFile(id: string, code: string): DiscoveryStoreUpdate;
+  updateFile(
+    id: string,
+    code: string,
+    options?: DiscoveryStoreUpdateOptions,
+  ): DiscoveryStoreUpdate;
   removeFile(id: string): DiscoveryStoreRemoval;
   clear(): void;
 }
@@ -49,6 +61,7 @@ export function createDiscoveryStore(
 ): DiscoveryStore {
   const fileMetas = new Map<string, DiscoveredMeta[]>();
   const fileLazyRefs = new Map<string, Set<string>>();
+  const fileFactoryProviders = new Map<string, FactoryProviderMeta[]>();
   const fileContentHashes = new Map<string, string>();
   const fileSources = options.trackSources
     ? new Map<string, string>()
@@ -61,19 +74,29 @@ export function createDiscoveryStore(
    * @param id - Module identifier or path.
    * @param code - Current file contents to analyze.
    */
-  function updateFile(id: string, code: string): DiscoveryStoreUpdate {
+  function updateFile(
+    id: string,
+    code: string,
+    options?: DiscoveryStoreUpdateOptions,
+  ): DiscoveryStoreUpdate {
+    const scanFactoryProviders = options?.factoryProviders ?? true;
     const previousMetas = fileMetas.get(id);
     const previousLazyClassKeys = fileLazyRefs.get(id);
+    const previousFactoryProviders = fileFactoryProviders.get(id);
 
     // Identical content yields identical scan results, so serve them from
     // the cache.
-    const contentHash = hashContent(code);
+    const contentHash = hashContent(
+      `${scanFactoryProviders ? "factory:1" : "factory:0"}\0${code}`,
+    );
     if (fileContentHashes.get(id) === contentHash) {
       return {
         metas: previousMetas ?? [],
         lazyClassKeys: new Set(previousLazyClassKeys),
+        factoryProviders: previousFactoryProviders ?? [],
         previousMetas,
         previousLazyClassKeys,
+        previousFactoryProviders,
       };
     }
     fileContentHashes.set(id, contentHash);
@@ -82,7 +105,9 @@ export function createDiscoveryStore(
       fileSources.set(id, code);
     }
 
-    const { metas, lazyClassKeys } = scanSource(code, id);
+    const { metas, lazyClassKeys, factoryProviders } = scanSource(code, id, {
+      factoryProviders: scanFactoryProviders,
+    });
 
     if (metas.length) {
       fileMetas.set(id, metas);
@@ -96,7 +121,20 @@ export function createDiscoveryStore(
       fileLazyRefs.delete(id);
     }
 
-    return { metas, lazyClassKeys, previousMetas, previousLazyClassKeys };
+    if (factoryProviders.length) {
+      fileFactoryProviders.set(id, factoryProviders);
+    } else {
+      fileFactoryProviders.delete(id);
+    }
+
+    return {
+      metas,
+      lazyClassKeys,
+      factoryProviders,
+      previousMetas,
+      previousLazyClassKeys,
+      previousFactoryProviders,
+    };
   }
 
   /**
@@ -107,13 +145,19 @@ export function createDiscoveryStore(
   function removeFile(id: string): DiscoveryStoreRemoval {
     const previousMetas = fileMetas.get(id);
     const previousLazyClassKeys = fileLazyRefs.get(id);
+    const previousFactoryProviders = fileFactoryProviders.get(id);
     fileMetas.delete(id);
     fileLazyRefs.delete(id);
+    fileFactoryProviders.delete(id);
     fileContentHashes.delete(id);
     if (fileSources) {
       fileSources.delete(id);
     }
-    return { previousMetas, previousLazyClassKeys };
+    return {
+      previousMetas,
+      previousLazyClassKeys,
+      previousFactoryProviders,
+    };
   }
 
   /**
@@ -122,6 +166,7 @@ export function createDiscoveryStore(
   function clear(): void {
     fileMetas.clear();
     fileLazyRefs.clear();
+    fileFactoryProviders.clear();
     fileContentHashes.clear();
     fileSources?.clear();
   }
@@ -129,6 +174,7 @@ export function createDiscoveryStore(
   return {
     fileMetas,
     fileLazyRefs,
+    fileFactoryProviders,
     fileSources,
     updateFile,
     removeFile,

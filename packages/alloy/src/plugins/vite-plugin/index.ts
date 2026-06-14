@@ -84,6 +84,8 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
   const discoveryRuntime = createDiscoveryRuntime();
 
+  const shouldTrackFactoryProviders = () => Boolean(resolvedVisualization);
+
   return {
     name: "vite-plugin-alloy",
     enforce: "pre",
@@ -139,7 +141,9 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         },
       },
       handler(code, id) {
-        discoveryRuntime.processUpdate(id, code);
+        discoveryRuntime.processUpdate(id, code, {
+          factoryProviders: shouldTrackFactoryProviders(),
+        });
         return null;
       },
     },
@@ -166,7 +170,9 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           return;
         }
 
-        discoveryChanged = discoveryRuntime.processUpdate(file, code);
+        discoveryChanged = discoveryRuntime.processUpdate(file, code, {
+          factoryProviders: shouldTrackFactoryProviders(),
+        });
       }
 
       if (!discoveryChanged) {
@@ -185,6 +191,16 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       discoveryRuntime.clear();
       for (const ref of providerModuleRefs) {
         this.addWatchFile(ref.absPath);
+        if (shouldTrackFactoryProviders()) {
+          try {
+            const code = fs.readFileSync(ref.absPath, "utf-8");
+            discoveryRuntime.processUpdate(ref.absPath, code, {
+              factoryProviders: true,
+            });
+          } catch {
+            // Ignore provider files the bundler will resolve later (e.g. package specifiers).
+          }
+        }
       }
 
       // Pre-scan project files in src/ to ensure complete discovery before load()
@@ -194,7 +210,9 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         if (/\.(tsx?|ts)$/i.test(file) && !file.endsWith(".d.ts")) {
           try {
             const code = fs.readFileSync(file, "utf-8");
-            discoveryRuntime.processUpdate(file, code);
+            discoveryRuntime.processUpdate(file, code, {
+              factoryProviders: shouldTrackFactoryProviders(),
+            });
           } catch {
             // Ignore read errors
           }
@@ -215,6 +233,11 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
           lazyReferencedClassKeys: discoveryRuntime.lazyReferencedClassKeys,
           manifests: options.manifests ?? [],
           providerImportPaths: providerModuleRefs.map((ref) => ref.importPath),
+          factoryProviders: shouldTrackFactoryProviders()
+            ? Array.from(
+                discoveryRuntime.factoryProvidersByFile.values(),
+              ).flat()
+            : [],
           lazyServiceKeys,
           packageName,
           resolvedRoot,

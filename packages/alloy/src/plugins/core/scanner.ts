@@ -1,13 +1,19 @@
 import fs from "node:fs";
 import ts, { SyntaxKind } from "typescript";
+import { ServiceScope } from "../../lib/scope";
 import { extractServiceMetadata } from "./decorators";
 import { processLazyCall, resolveModuleSpecifierCandidates } from "./lazy";
 import { createClassKey, createSymbolKey } from "./utils";
-import type { DiscoveredMeta } from "./types";
+import type { DiscoveredMeta, FactoryProviderMeta } from "./types";
 
 export interface ScanResult {
   metas: DiscoveredMeta[];
   lazyClassKeys: Set<string>;
+  factoryProviders: FactoryProviderMeta[];
+}
+
+export interface ScanSourceOptions {
+  factoryProviders?: boolean;
 }
 
 interface ImportInfo {
@@ -83,16 +89,32 @@ function collectFileImports(
  * discovery results: decorators require an `@` and lazy references require
  * the `Lazy` identifier.
  */
-function mayContainDiscoverableSyntax(code: string): boolean {
-  return code.includes("@") || code.includes("Lazy");
+function shouldScanFactoryProviders(options?: ScanSourceOptions): boolean {
+  return options?.factoryProviders ?? true;
+}
+
+function mayContainDiscoverableSyntax(
+  code: string,
+  options?: ScanSourceOptions,
+): boolean {
+  return (
+    code.includes("@") ||
+    code.includes("Lazy") ||
+    (shouldScanFactoryProviders(options) && code.includes("asFactory"))
+  );
 }
 
 /** Exported for tests only. */
 export const __scannerInternals = { mayContainDiscoverableSyntax };
 
-export function scanSource(code: string, id: string): ScanResult {
-  if (!mayContainDiscoverableSyntax(code)) {
-    return { metas: [], lazyClassKeys: new Set() };
+export function scanSource(
+  code: string,
+  id: string,
+  options?: ScanSourceOptions,
+): ScanResult {
+  const scanFactoryProviders = shouldScanFactoryProviders(options);
+  if (!mayContainDiscoverableSyntax(code, options)) {
+    return { metas: [], lazyClassKeys: new Set(), factoryProviders: [] };
   }
 
   const sourceFile = ts.createSourceFile(
@@ -103,6 +125,7 @@ export function scanSource(code: string, id: string): ScanResult {
   );
   const discovered = new Map<string, DiscoveredMeta>();
   const lazyRefs = new Set<string>();
+  const factoryProviders: FactoryProviderMeta[] = [];
   const fileImports = collectFileImports(sourceFile);
   const decoratorResolutionCache: DecoratorResolutionCache = new Map();
 
@@ -117,12 +140,24 @@ export function scanSource(code: string, id: string): ScanResult {
       });
     } else if (ts.isCallExpression(node)) {
       processLazyCall(node, id, sourceFile, lazyRefs);
+      if (scanFactoryProviders) {
+        handleFactoryProviderCall(node, {
+          id,
+          sourceFile,
+          fileImports,
+          factoryProviders,
+        });
+      }
     }
     ts.forEachChild(node, visit);
   };
 
   ts.forEachChild(sourceFile, visit);
-  return { metas: Array.from(discovered.values()), lazyClassKeys: lazyRefs };
+  return {
+    metas: Array.from(discovered.values()),
+    lazyClassKeys: lazyRefs,
+    factoryProviders,
+  };
 }
 
 interface ClassVisitContext {
@@ -131,6 +166,127 @@ interface ClassVisitContext {
   fileImports: Map<string, ImportInfo>;
   discovered: Map<string, DiscoveredMeta>;
   decoratorResolutionCache: DecoratorResolutionCache;
+}
+
+interface FactoryProviderVisitContext {
+  id: string;
+  sourceFile: ts.SourceFile;
+  fileImports: Map<string, ImportInfo>;
+  factoryProviders: FactoryProviderMeta[];
+}
+
+function handleFactoryProviderCall(
+  node: ts.CallExpression,
+  context: FactoryProviderVisitContext,
+): void {
+  if (
+    !isAlloyRuntimeHelper(node.expression, "asFactory", context.fileImports)
+  ) {
+    return;
+  }
+
+  const tokenArg = node.arguments[0];
+  if (!tokenArg) {
+    return;
+  }
+
+  context.factoryProviders.push({
+    filePath: context.id,
+    tokenExpression: tokenArg.getText(context.sourceFile),
+    tokenLabel: createFactoryTokenLabel(tokenArg, context.sourceFile),
+    lifecycle: extractFactoryLifecycle(node.arguments[2]),
+  });
+}
+
+function isAlloyRuntimeHelper(
+  expression: ts.LeftHandSideExpression,
+  helperName: string,
+  fileImports: Map<string, ImportInfo>,
+): boolean {
+  if (ts.isIdentifier(expression)) {
+    const importInfo = fileImports.get(expression.text);
+    return Boolean(
+      importInfo &&
+      !importInfo.isTypeOnly &&
+      importInfo.path === ALLOY_RUNTIME_MODULE &&
+      (importInfo.originalName ?? expression.text) === helperName,
+    );
+  }
+
+  if (
+    ts.isPropertyAccessExpression(expression) &&
+    ts.isIdentifier(expression.expression)
+  ) {
+    const importInfo = fileImports.get(expression.expression.text);
+    return Boolean(
+      importInfo &&
+      !importInfo.isTypeOnly &&
+      importInfo.path === ALLOY_RUNTIME_MODULE &&
+      importInfo.originalName === "*" &&
+      expression.name.text === helperName,
+    );
+  }
+
+  return false;
+}
+
+function createFactoryTokenLabel(
+  tokenArg: ts.Expression,
+  sourceFile: ts.SourceFile,
+): string {
+  if (ts.isIdentifier(tokenArg)) {
+    return tokenArg.text;
+  }
+  return tokenArg.getText(sourceFile);
+}
+
+function extractFactoryLifecycle(
+  optionsArg: ts.Expression | undefined,
+): string {
+  if (!optionsArg || !ts.isObjectLiteralExpression(optionsArg)) {
+    return ServiceScope.SINGLETON;
+  }
+
+  for (const prop of optionsArg.properties) {
+    if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) {
+      continue;
+    }
+    if (prop.name.text !== "lifecycle") {
+      continue;
+    }
+    return lifecycleExpressionToScope(prop.initializer);
+  }
+
+  return ServiceScope.SINGLETON;
+}
+
+function lifecycleExpressionToScope(expression: ts.Expression): string {
+  if (ts.isStringLiteralLike(expression)) {
+    return expression.text;
+  }
+
+  if (ts.isCallExpression(expression)) {
+    const callTarget = expression.expression;
+    if (
+      ts.isPropertyAccessExpression(callTarget) &&
+      (callTarget.name.text === "singleton" ||
+        callTarget.name.text === "transient")
+    ) {
+      return callTarget.name.text;
+    }
+  }
+
+  if (ts.isPropertyAccessExpression(expression)) {
+    const member = expression.name.text;
+    if (member === "SINGLETON") {
+      return ServiceScope.SINGLETON;
+    }
+    if (member === "TRANSIENT") {
+      return ServiceScope.TRANSIENT;
+    }
+  }
+
+  return ServiceScope.SINGLETON;
 }
 
 function handleClassDeclaration(

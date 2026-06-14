@@ -191,6 +191,30 @@ describe("Vite Plugin Alloy - lifecycle & HMR", () => {
     expect(sent).toEqual([]);
   });
 
+  it("hotUpdate leaves factory-provider-only edits alone when visualization is disabled", async () => {
+    const plugin = alloy();
+    const id = "/src/providers.ts";
+    const before = `
+      import { asFactory } from 'alloy-di/runtime';
+      asFactory(ApiClientToken, () => ({ version: 1 }));
+    `;
+    const after = `
+      import { asFactory } from 'alloy-di/runtime';
+      asFactory(ApiClientToken, () => ({ version: 2 }));
+    `;
+    applyTransform(plugin, before, id);
+
+    const { result, invalidatedIds, sent } = await applyHotUpdate(plugin, {
+      file: id,
+      type: "update",
+      code: after,
+    });
+
+    expect(result).toBeUndefined();
+    expect(invalidatedIds).toEqual([]);
+    expect(sent).toEqual([]);
+  });
+
   it("hotUpdate ignores files outside the discovery scope", async () => {
     const plugin = alloy();
     const { result, invalidatedIds, sent } = await applyHotUpdate(plugin, {

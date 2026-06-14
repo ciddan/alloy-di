@@ -1,5 +1,10 @@
 import path from "node:path";
-import type { BuildScope, DependencyDescriptor, DiscoveredMeta } from "./types";
+import type {
+  BuildScope,
+  DependencyDescriptor,
+  DiscoveredMeta,
+  FactoryProviderMeta,
+} from "./types";
 import type { ServiceScope } from "../../lib/scope";
 import {
   isDependencyAllowed,
@@ -17,7 +22,7 @@ const VIOLATION_EDGE_COLOR = "#ff4d4f";
 /** Suffix appended to a violating edge's label. */
 const VIOLATION_LABEL_SUFFIX = " ⚠️";
 
-type GraphNodeType = "service" | "token";
+type GraphNodeType = "service" | "token" | "factory";
 
 interface GraphNode {
   id: string;
@@ -57,6 +62,7 @@ export interface MermaidDiagramOptions {
 export interface MermaidDiagramInput {
   metas: DiscoveredMeta[];
   lazyClassKeys?: Set<string>;
+  factoryProviders?: FactoryProviderMeta[];
   options?: MermaidDiagramOptions;
   /**
    * Declared custom scope hierarchy. When provided, service nodes are grouped
@@ -70,6 +76,7 @@ export interface MermaidDiagramArtifact {
   nodeCount: number;
   edgeCount: number;
   tokenCount: number;
+  factoryCount: number;
 }
 
 const DEFAULT_SCOPE_COLORS: Partial<Record<ServiceScope, string>> = {
@@ -137,6 +144,7 @@ const RESERVED_IDENTIFIERS = new Set([
 export function generateMermaidDiagram({
   metas,
   lazyClassKeys,
+  factoryProviders,
   options,
   scopes,
 }: MermaidDiagramInput): MermaidDiagramArtifact {
@@ -171,6 +179,7 @@ export function generateMermaidDiagram({
   const nodesByClassName = new Map<string, GraphNode[]>();
   const nodesByFilePath = new Map<string, GraphNode[]>();
   const tokenNodes = new Map<string, GraphNode>();
+  const factoryNodes = new Map<string, GraphNode>();
   const nodeByMeta = new Map<DiscoveredMeta, GraphNode>();
 
   metas.forEach((meta, index) => {
@@ -201,6 +210,10 @@ export function generateMermaidDiagram({
     nodesByFilePath.set(normalizedPath, pathBucket);
   });
 
+  for (const provider of factoryProviders ?? []) {
+    ensureFactoryNode(factoryNodes, provider);
+  }
+
   const edges: GraphEdge[] = [];
   const edgeKeys = new Set<string>();
 
@@ -226,6 +239,7 @@ export function generateMermaidDiagram({
           nodesByClassName,
           nodesByFilePath,
           tokenNodes,
+          factoryNodes,
         );
         for (const target of resolvedTargets) {
           if (target.id === sourceNode.id) {
@@ -294,6 +308,7 @@ export function generateMermaidDiagram({
 
   const allNodes: GraphNode[] = [
     ...serviceNodes,
+    ...Array.from(factoryNodes.values()),
     ...Array.from(tokenNodes.values()),
   ];
 
@@ -303,7 +318,11 @@ export function generateMermaidDiagram({
   const groupedNodes = new Map<string, GraphNode[]>();
   const ungroupedNodes: GraphNode[] = [];
   for (const node of allNodes) {
-    if (node.type === "service" && node.scope && customScopes.has(node.scope)) {
+    if (
+      (node.type === "service" || node.type === "factory") &&
+      node.scope &&
+      customScopes.has(node.scope)
+    ) {
       const bucket = groupedNodes.get(node.scope) ?? [];
       bucket.push(node);
       groupedNodes.set(node.scope, bucket);
@@ -362,6 +381,7 @@ export function generateMermaidDiagram({
     nodeCount: allNodes.length,
     edgeCount: edges.length,
     tokenCount: tokenNodes.size,
+    factoryCount: factoryNodes.size,
   };
 }
 
@@ -413,8 +433,9 @@ function scopeCode(node: GraphNode): string {
 
 /**
  * True when an edge captures a shorter-lived dependency in a longer-lived host,
- * per the declared hierarchy. Only service-to-service edges with known scopes
- * are considered, and only when a custom hierarchy is configured.
+ * per the declared hierarchy. Service dependencies on scoped factory providers
+ * are checked too: factory bodies are opaque, but the factory result lifecycle
+ * is known and can still be captive.
  */
 function isStabilityViolation(
   from: GraphNode,
@@ -424,7 +445,10 @@ function isStabilityViolation(
   if (!scopes) {
     return false;
   }
-  if (from.type !== "service" || to.type !== "service") {
+  if (from.type !== "service") {
+    return false;
+  }
+  if (to.type !== "service" && to.type !== "factory") {
     return false;
   }
   if (!from.scope || !to.scope) {
@@ -451,6 +475,9 @@ function nodeFill(
 ): string | undefined {
   if (node.type === "token") {
     return `fill:${opts.tokenNodeFill}`;
+  }
+  if (node.type === "factory") {
+    return `fill:${opts.factoryNodeFill}`;
   }
   if (node.hasFactory) {
     return `fill:${opts.factoryNodeFill}`;
@@ -526,6 +553,7 @@ function resolveTargetsForIdentifier(
   nodesByClassName: Map<string, GraphNode[]>,
   nodesByFilePath: Map<string, GraphNode[]>,
   tokenNodes: Map<string, GraphNode>,
+  factoryNodes: Map<string, GraphNode>,
 ): GraphNode[] {
   const serviceMatches = resolveServiceTargets(
     identifier,
@@ -543,6 +571,10 @@ function resolveTargetsForIdentifier(
   }
 
   const tokenLabel = createTokenLabel(identifier || fallbackExpression);
+  const factoryNode = factoryNodes.get(tokenLabel);
+  if (factoryNode) {
+    return [factoryNode];
+  }
   return [ensureTokenNode(tokenNodes, tokenLabel)];
 }
 
@@ -648,6 +680,34 @@ function ensureTokenNode(
     hasFactory: false,
   };
   tokenNodes.set(label, node);
+  return node;
+}
+
+function ensureFactoryNode(
+  factoryNodes: Map<string, GraphNode>,
+  provider: FactoryProviderMeta,
+): GraphNode {
+  const label = createTokenLabel(
+    provider.tokenLabel || provider.tokenExpression,
+  );
+  const existing = factoryNodes.get(label);
+  if (existing) {
+    return existing;
+  }
+  const node: GraphNode = {
+    id: sanitizeMermaidId(
+      `factory:${provider.filePath}:${provider.tokenExpression}`,
+      factoryNodes.size,
+    ),
+    label: `Factory: ${label}`,
+    key: label,
+    scope: provider.lifecycle,
+    type: "factory",
+    isLazyOnly: false,
+    hasFactory: true,
+    filePath: normalizeImportPath(provider.filePath),
+  };
+  factoryNodes.set(label, node);
   return node;
 }
 
