@@ -62,6 +62,7 @@ export default defineConfig({
         items: [
           { text: "What is Alloy?", link: "/guide/what-is-alloy" },
           { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Migrating from v1", link: "/guide/migration-v1" },
         ],
       },
       {
