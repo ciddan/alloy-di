@@ -54,9 +54,6 @@ function makeCompiler(root: string) {
       resolve: {},
     },
     hooks: {
-      beforeRun: new Hook(),
-      run: new Hook(),
-      watchRun: new Hook(),
       beforeCompile: new Hook(),
       thisCompilation: new Hook(),
       normalModuleFactory: new Hook(),

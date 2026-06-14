@@ -25,9 +25,6 @@ interface WebpackLikeCompiler {
     };
   };
   hooks?: {
-    beforeRun?: TapHook;
-    run?: TapHook;
-    watchRun?: TapHook;
     beforeCompile?: TapHook;
     thisCompilation?: TapHook;
     normalModuleFactory?: TapHook;
@@ -155,16 +152,12 @@ export function createWebpackLikeAlloyPlugin(
   }
 
   function configureLifecycleHooks(compiler: WebpackLikeCompiler): void {
-    const tapCompileHook = (hook: TapHook | undefined): void => {
-      hook?.tapPromise?.(pluginOptions.name, async () => {
+    compiler.hooks?.beforeCompile?.tapPromise?.(
+      pluginOptions.name,
+      async () => {
         await writeContainer();
-      });
-    };
-
-    tapCompileHook(compiler.hooks?.beforeRun);
-    tapCompileHook(compiler.hooks?.run);
-    tapCompileHook(compiler.hooks?.watchRun);
-    tapCompileHook(compiler.hooks?.beforeCompile);
+      },
+    );
 
     compiler.hooks?.thisCompilation?.tap?.(
       pluginOptions.name,
