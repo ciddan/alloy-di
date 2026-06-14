@@ -1,6 +1,6 @@
 {
   "name": "alloy-di",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "description": "A build-time dependency injection plugin for TypeScript apps",
   "keywords": [
     "dependency-injection",

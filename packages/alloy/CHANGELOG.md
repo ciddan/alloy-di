@@ -1,5 +1,78 @@
 # alloy-di
 
+## 2.0.0
+
+### Major Changes
+
+- cd1878d: Add Webpack and Rspack compiler plugins for build-time container code generation.
+- f1ad94e: Always enforce scope stability for the built-in lifecycles. A singleton service
+  may no longer depend on a transient one: the transient would be captured by the
+  longer-lived singleton and effectively leak. Previously this was only checked
+  when custom `scopes` were configured (to preserve v1 behavior); it now applies
+  to every build with no configuration required.
+
+  This is a breaking change. Builds with a singleton (or any longer-lived service)
+  that depends on a transient will now fail with a scope-stability violation.
+  Resolve it by making the dependency at least as long-lived as its host, or by
+  making the host transient or custom scoped.
+
+- 95b9cd0: Extract the test-container utilities into a new published package,
+  `@alloy-di/testing`, with a runner-neutral core and thin adapters:
+  - `@alloy-di/testing` — runner-neutral `createTestContainer` (supply your own
+    `mockFn`), plus `MockOf`, `GenericSpy`, and `MockFnFactory` types.
+  - `@alloy-di/testing/vitest` — wires `vi.fn`.
+  - `@alloy-di/testing/jest` — wires `jest.fn` from `@jest/globals`.
+  - `@alloy-di/testing/node` — wires `mock.fn()` from `node:test`.
+
+  Each adapter exposes both a direct `createTestContainer` and a hook-registering
+  `setupAlloyTesting()` for automatic per-test cleanup. Importing an adapter never
+  registers test hooks on its own.
+
+  **BREAKING (`alloy-di`):** the `alloy-di/test` entry has been **removed**.
+  Migrate testing imports to a `@alloy-di/testing` adapter:
+
+  ```ts
+  // Before
+  import { createTestContainer } from "alloy-di/test";
+  // After
+  import { createTestContainer } from "@alloy-di/testing/vitest";
+  ```
+
+  `alloy-di` no longer depends on a test runner at all (the `vitest` peer
+  dependency has been dropped); `@alloy-di/testing` owns that coupling.
+
+- f1ad94e: The Rollup manifest plugin now enforces the base scope-stability rule on every
+  build, matching the consumer plugins: a longer-lived service may not depend on a
+  shorter-lived one, so a singleton may not depend on a transient. Previously the
+  Rollup plugin only validated when custom `scopes` were configured. Library
+  builds with a captive dependency will now fail with a scope-stability violation.
+- f1ad94e: Remove the dangling top-level `module`/`types` package fields, which pointed at
+  a `dist/index.*` bundle the build never emitted. `alloy-di` is intentionally a
+  subpath-only package: import from its documented entry points
+  (`alloy-di/runtime`, `alloy-di/vite`, `alloy-di/webpack`, `alloy-di/rspack`,
+  `alloy-di/rollup`, `alloy-di/generate`, `alloy-di/scopes`). A bare
+  `import … from "alloy-di"` was never resolvable and remains unsupported.
+
+### Patch Changes
+
+- 2d03b01: Add `alloy generate` and `alloy-di/generate` for writing Alloy declaration
+  artifacts before type-checking, without running a Vite build. The Vite plugin
+  and generator now also support `sourceDirs` for scanning services outside
+  `src`.
+- f1ad94e: Harden code generation to escape single quotes when serializing a custom scope
+  name into the per-service meta block, so an unusual scope name can no longer
+  break out of the generated string literal.
+- f1ad94e: Fix `overrideInstance` to honor deliberately falsy overrides (`null`, `0`,
+  `""`, `false`). Resolution now checks for the presence of an override/cached
+  instance rather than its truthiness, so a falsy test double short-circuits
+  resolution instead of falling through to construct the real service.
+- e5a2834: Fix code generation to correctly serialize custom runtime scopes (e.g., `session`, `request`) in the generated options block.
+- f1ad94e: Expand the webpack/Rspack adapter test suite: assert the generated container
+  module is well-formed, that the bundler mode is injected into env detection,
+  that the cache file and source directories are registered as build/watch
+  dependencies, and that an array-form `resolve.alias` is appended to (and an
+  existing entry updated) rather than overwritten.
+
 ## 1.5.0
 
 ### Minor Changes
