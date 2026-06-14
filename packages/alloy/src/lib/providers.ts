@@ -42,7 +42,7 @@
  * placeholder while still attaching structured metadata. The descriptor stores lifecycle, dependency
  * declarations, and the wrapped lazy factory function.
  */
-import type { Container } from "./container";
+import type { Container, FactoryFn } from "./container";
 import { dependenciesRegistry } from "./decorators";
 import { Lazy } from "./lazy";
 import { isConstructor } from "./types";
@@ -112,11 +112,20 @@ export interface LazyServiceProviderDescriptor<T = unknown> {
   deps?: DependenciesOption;
 }
 
+/** Descriptor for a token-bound factory provider with an explicit lifecycle. */
+export interface FactoryProviderDescriptor<T = unknown> {
+  kind: "factory";
+  token: Token<T>;
+  factory: FactoryFn<T>;
+  lifecycle: ProviderLifecycle;
+}
+
 /** Aggregate provider definitions for batch application. */
 export interface ProviderDefinitions {
   values?: ValueProviderDescriptor[];
   services?: ServiceProviderDescriptor[];
   lazyServices?: LazyPlaceholder[];
+  factories?: FactoryProviderDescriptor[];
 }
 
 /**
@@ -152,6 +161,31 @@ export function asClass<T extends Newable<unknown>>(
     useClass,
     lifecycle: options.lifecycle,
     deps: options.deps,
+  };
+}
+
+/**
+ * Create a factory provider: bind a token to a function executed at resolution
+ * time. Mirrors `asClass` — a token, a factory function, and a lifecycle.
+ *
+ * The factory receives the container and may be async, so it can resolve its
+ * own dependencies. `singleton` caches the result; `transient` re-runs on every
+ * resolution.
+ *
+ * @param token Token the produced value is bound to (its type checks `factory`'s return).
+ * @param factory Function invoked with the container; may be async.
+ * @param options.lifecycle Lifecycle scope (singleton or transient).
+ */
+export function asFactory<T>(
+  token: Token<T>,
+  factory: FactoryFn<T>,
+  options: { lifecycle: ProviderLifecycle },
+): FactoryProviderDescriptor<T> {
+  return {
+    kind: "factory",
+    token,
+    factory,
+    lifecycle: options.lifecycle,
   };
 }
 
@@ -342,6 +376,15 @@ export function applyProviders(
     // Values: bind immediately.
     for (const valueProvider of definition.values ?? []) {
       container.provideValue(valueProvider.token, valueProvider.value);
+    }
+
+    // Factories: register on the container. Bodies are opaque, so they are not
+    // part of constructor cycle detection above; the container's runtime guard
+    // catches factory re-entrancy instead.
+    for (const factoryProvider of definition.factories ?? []) {
+      container.provideFactory(factoryProvider.token, factoryProvider.factory, {
+        lifecycle: factoryProvider.lifecycle,
+      });
     }
 
     // Helper to register service metadata (normal or lazy).
