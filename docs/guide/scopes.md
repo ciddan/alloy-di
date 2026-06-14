@@ -12,14 +12,13 @@ Alloy's core runtime provides `singleton` and `transient`. Hierarchical scopes a
 
 Every lifecycle has a position in a hierarchy from longest-lived to shortest-lived:
 
-```
-singleton  (root — implicit, always present)
-   ▼
- session   (custom scope)
-   ▼
- request   (custom scope)
-   ▼
-transient  (leaf — implicit, never cached)
+```mermaid
+graph TD
+  singleton["singleton — implicit root"]
+  session["session — custom scope"]
+  request["request — custom scope"]
+  transient["transient — implicit leaf"]
+  singleton --> session --> request --> transient
 ```
 
 - **`singleton`** is the implicit **root**: it always bubbles up to and caches on the root `Container`.
