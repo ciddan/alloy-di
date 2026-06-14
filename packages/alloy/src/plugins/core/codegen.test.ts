@@ -413,6 +413,19 @@ describe("custom scope code generation", () => {
     expect(code).toContain("{ ctor: SessionSvc, meta: { scope: 'session' } }");
   });
 
+  // A scope name containing a single quote must not break out of the generated
+  // string literal (defense-in-depth; well-formed scope names never do this).
+  it("escapes single quotes in a custom scope name", () => {
+    const scoped = {
+      className: "OddSvc",
+      filePath: "/src/odd-svc.ts",
+      metadata: { scope: "we'rd", dependencies: [] },
+    };
+    const code = generateContainerModule([scoped], new Set(), []);
+    expect(code).toContain("scope: 'we\\'rd'");
+    expect(code).not.toContain("scope: 'we'rd'");
+  });
+
   it("still serializes the built-in singleton scope", () => {
     const singleton = {
       className: "SingletonSvc",

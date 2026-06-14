@@ -362,7 +362,7 @@ function reconstructOptionsText(
   }
 
   if (scope && scope !== "transient") {
-    parts.push(`scope: '${scope}'`);
+    parts.push(`scope: '${escapeSingleQuotes(scope)}'`);
   }
 
   if (dependencies && dependencies.length > 0) {
