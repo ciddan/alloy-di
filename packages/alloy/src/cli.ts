@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { InlineConfig, ResolvedConfig } from "vite";
 import { generate, type AlloyGenerateOptions } from "./generate";
 import {
@@ -7,13 +8,26 @@ import {
   type AlloyPluginOptions,
 } from "./plugins/vite-plugin";
 
-interface GenerateCliOptions {
+export interface GenerateCliOptions {
   root?: string;
   configFile?: string;
+  help?: boolean;
 }
 
-function printUsage(): void {
-  console.log(`Usage:
+export interface RunCliDependencies {
+  generate: typeof generate;
+  resolveGenerateOptions: typeof resolveGenerateOptions;
+  log: (message: string) => void;
+}
+
+const defaultRunCliDependencies: RunCliDependencies = {
+  generate,
+  resolveGenerateOptions,
+  log: (message) => console.log(message),
+};
+
+export function printUsage(log: (message: string) => void = console.log): void {
+  log(`Usage:
   alloy generate [--root <dir>] [--config <file>]
 
 Commands:
@@ -24,7 +38,7 @@ Options:
   --config  Vite config file to load. Pass "false" to skip config loading.`);
 }
 
-function readOptionValue(
+export function readOptionValue(
   args: string[],
   index: number,
   optionName: string,
@@ -36,7 +50,7 @@ function readOptionValue(
   return value;
 }
 
-function parseGenerateArgs(args: string[]): GenerateCliOptions {
+export function parseGenerateArgs(args: string[]): GenerateCliOptions {
   const options: GenerateCliOptions = {};
 
   for (let i = 0; i < args.length; i++) {
@@ -48,8 +62,8 @@ function parseGenerateArgs(args: string[]): GenerateCliOptions {
       options.configFile = readOptionValue(args, i, arg);
       i++;
     } else if (arg === "--help" || arg === "-h") {
-      printUsage();
-      process.exit(0);
+      options.help = true;
+      return options;
     } else {
       throw new Error(`[alloy] Unknown option "${arg}".`);
     }
@@ -58,7 +72,9 @@ function parseGenerateArgs(args: string[]): GenerateCliOptions {
   return options;
 }
 
-function getAlloyOptions(plugin: unknown): AlloyPluginOptions | undefined {
+export function getAlloyOptions(
+  plugin: unknown,
+): AlloyPluginOptions | undefined {
   if (!plugin || typeof plugin !== "object") {
     return undefined;
   }
@@ -67,7 +83,7 @@ function getAlloyOptions(plugin: unknown): AlloyPluginOptions | undefined {
   ];
 }
 
-async function resolveGenerateOptions(
+export async function resolveGenerateOptions(
   cliOptions: GenerateCliOptions,
 ): Promise<AlloyGenerateOptions> {
   const root = cliOptions.root ? path.resolve(cliOptions.root) : process.cwd();
@@ -112,11 +128,14 @@ async function resolveGenerateOptions(
   };
 }
 
-async function run(): Promise<void> {
-  const [command, ...args] = process.argv.slice(2);
+export async function runCli(
+  args: string[] = process.argv.slice(2),
+  deps: RunCliDependencies = defaultRunCliDependencies,
+): Promise<void> {
+  const [command, ...commandArgs] = args;
 
   if (!command || command === "--help" || command === "-h") {
-    printUsage();
+    printUsage(deps.log);
     return;
   }
 
@@ -124,15 +143,27 @@ async function run(): Promise<void> {
     throw new Error(`[alloy] Unknown command "${command}".`);
   }
 
-  const cliOptions = parseGenerateArgs(args);
-  const options = await resolveGenerateOptions(cliOptions);
-  const result = await generate(options);
-  console.log(
+  const cliOptions = parseGenerateArgs(commandArgs);
+  if (cliOptions.help) {
+    printUsage(deps.log);
+    return;
+  }
+  const options = await deps.resolveGenerateOptions(cliOptions);
+  const result = await deps.generate(options);
+  deps.log(
     `[alloy] Generated declarations for ${result.serviceCount} service(s) in ${result.declarationDir}.`,
   );
 }
 
-run().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+function isMainModule(): boolean {
+  return process.argv[1]
+    ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+    : false;
+}
+
+if (isMainModule()) {
+  runCli().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}
