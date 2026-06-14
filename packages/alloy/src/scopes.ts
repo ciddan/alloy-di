@@ -50,6 +50,10 @@ export class Scope implements ResolutionContext {
     return this.cached.get(target);
   }
 
+  public hasCached(target: Constructor): boolean {
+    return this.cached.has(target);
+  }
+
   public setCached(target: Constructor, instance: unknown): void {
     this.cached.set(target, instance);
     this.instantiatedInstances.push(instance);

@@ -31,6 +31,10 @@ export interface FactoryPendingEntry {
 export interface ResolutionContext {
   readonly scopeName: ServiceScope;
   getCached(target: Constructor): unknown;
+  // Presence-based, like the factory cache: a cached entry may legitimately be
+  // falsy (e.g. a test override), so callers must check `hasCached` rather than
+  // the truthiness of `getCached`.
+  hasCached(target: Constructor): boolean;
   setCached(target: Constructor, instance: unknown): void;
   getPending(target: Constructor): Promise<unknown> | undefined;
   setPending(target: Constructor, promise: Promise<unknown>): void;
