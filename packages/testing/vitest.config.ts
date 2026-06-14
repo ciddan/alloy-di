@@ -8,7 +8,8 @@ export default defineConfig({
     coverage: {
       exclude: [
         ...(configDefaults.coverage.exclude ?? []),
-        "./src/adapters/**",
+        "./src/adapters/jest.ts",
+        "./src/adapters/node.ts",
         "**/*.test.ts",
       ],
       provider: "v8",

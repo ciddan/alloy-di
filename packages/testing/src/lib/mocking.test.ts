@@ -156,4 +156,52 @@ describe("applyAutoMocks", () => {
     expect(result.mocks.has(Branch)).toBe(false);
     expect(result.mocks.has(Leaf)).toBe(true);
   });
+
+  it("visits shared dependencies once in a diamond graph", () => {
+    class Shared {}
+    class Left {}
+    class Right {}
+    class Root {}
+
+    dependenciesRegistry.set(Shared, { dependencies: () => [] });
+    dependenciesRegistry.set(Left, { dependencies: () => [Shared] });
+    dependenciesRegistry.set(Right, { dependencies: () => [Shared] });
+    dependenciesRegistry.set(Root, { dependencies: () => [Left, Right] });
+
+    const container = new Container();
+    const result = applyAutoMocks({
+      target: Root,
+      container,
+      overridesCtors: new Set<Newable<unknown>>(),
+      mockFn,
+    });
+
+    expect(result.mocks.has(Left)).toBe(true);
+    expect(result.mocks.has(Right)).toBe(true);
+    expect(result.mocks.has(Shared)).toBe(true);
+  });
+
+  it("returns the real constructor for an overridden lazy dependency", async () => {
+    class LazyOverridden {
+      run() {
+        return "real";
+      }
+    }
+    class Root {}
+
+    const lazy = Lazy(() => Promise.resolve(LazyOverridden));
+    dependenciesRegistry.set(Root, { dependencies: () => [lazy] });
+
+    const container = new Container();
+    const result = applyAutoMocks({
+      target: Root,
+      container,
+      overridesCtors: new Set<Newable<unknown>>([LazyOverridden]),
+      mockFn,
+    });
+
+    const resolved = await lazy.importer();
+    expect(resolved).toBe(LazyOverridden);
+    expect(result.mocks.has(LazyOverridden)).toBe(false);
+  });
 });

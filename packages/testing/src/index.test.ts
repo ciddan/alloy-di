@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createToken, dependenciesRegistry } from "alloy-di/runtime";
+import { createToken, dependenciesRegistry, Lazy } from "alloy-di/runtime";
 import { createTestContainer } from "./index";
 
 type RegistryEntry = Parameters<(typeof dependenciesRegistry)["set"]>;
@@ -89,5 +89,41 @@ describe("runner-neutral core", () => {
     expect(test.getMock(Dep)).toBeDefined();
     expect(created).toBeGreaterThan(0);
     test.restore();
+  });
+
+  it("mocks lazy dependencies and reverts the patched importer on restore()", async () => {
+    class LazyDep {
+      run() {
+        return "real";
+      }
+    }
+    class Target {}
+
+    const lazy = Lazy(() => Promise.resolve(LazyDep));
+    // oxlint-disable-next-line no-explicit-any -- test reaches into the lazy importer.
+    const originalImporter = (lazy as any).importer;
+    dependenciesRegistry.set(Target, { dependencies: () => [lazy] });
+
+    const test = createTestContainer({
+      autoMock: true,
+      target: Target,
+      mockFn: () => vi.fn(),
+    });
+
+    // The importer is patched while the test container is active.
+    // oxlint-disable-next-line no-explicit-any -- test reaches into the lazy importer.
+    expect((lazy as any).importer).not.toBe(originalImporter);
+
+    // Triggering the patched importer lazily creates and tracks a mock.
+    // oxlint-disable-next-line no-explicit-any -- test reaches into the lazy importer.
+    const MockedCtor = (await (lazy as any).importer()) as new () => LazyDep;
+    new MockedCtor().run();
+    expect(test.getMock(LazyDep)).toBeDefined();
+
+    test.restore();
+
+    // restore() reverts the importer to the original.
+    // oxlint-disable-next-line no-explicit-any -- test reaches into the lazy importer.
+    expect((lazy as any).importer).toBe(originalImporter);
   });
 });
