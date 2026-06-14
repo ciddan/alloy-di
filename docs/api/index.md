@@ -329,12 +329,14 @@ Consumer app configuration:
 
 ```ts
 // vite.config.ts
-import alloy from "alloy-di/vite";
+import { alloy } from "alloy-di/vite";
+import { manifest } from "@scope/lib/manifest";
+
 export default {
   plugins: [
     alloy({
       providers: ["src/providers.ts"],
-      manifests: ["node_modules/@scope/lib/dist/alloy.manifest.mjs"],
+      manifests: [manifest],
     }),
   ],
 };

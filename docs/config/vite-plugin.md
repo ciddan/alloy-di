@@ -61,11 +61,13 @@ List of `ServiceIdentifier` symbols to mark as **factory-lazy**.
 
 When a service is marked as factory-lazy, Alloy will not import the service module statically in the generated container. Instead, it generates a stub and uses a dynamic import factory. This allows the entire service implementation (and its dependencies) to be split into a separate chunk that is loaded only when the service is first requested.
 
+`lazyServices` targets services that come from an [internal library](/guide/libraries): pass the identifier exported by that library's generated `…/service-identifiers` module — the same packages you consume via [`manifests`](#manifests).
+
 ```typescript
-import { serviceIdentifiers } from "./src/virtual-container";
+import { ReportingServiceIdentifier } from "@acme/my-lib/service-identifiers";
 
 alloy({
-  lazyServices: [serviceIdentifiers.ReportingService],
+  lazyServices: [ReportingServiceIdentifier],
 });
 ```
 
@@ -155,10 +157,10 @@ alloy({
 This single declaration drives three things at build time:
 
 1. **Type-safe scope names** — the names are emitted into a generated `alloy-scopes.d.ts` so `@Injectable("session")` type-checks and typos are caught.
-2. **Scope-stability validation** — a longer-lived service depending on a shorter-lived one (a captive dependency) becomes a build error.
+2. **Extended scope-stability validation** — your custom lifecycles join the dependency-graph check so a longer-lived service depending on a shorter-lived one (a captive dependency) becomes a build error.
 3. **Runtime hierarchy registration** — the parent ordering is baked into the generated container so child scopes can be validated against it.
 
-Scope-stability validation only runs when this option is set, so projects without custom scopes are unaffected. See the [Hierarchical Scopes guide](/guide/scopes) for the full model.
+The base [scope-stability rule](/guide/scopes#build-time-scope-stability-validation) — a singleton may not depend on a transient — is always enforced, even without this option; declaring `scopes` extends the same check across your custom hierarchy. See the [Hierarchical Scopes guide](/guide/scopes) for the full model.
 
 ### visualize
 

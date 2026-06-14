@@ -143,6 +143,8 @@ Because Alloy builds the full dependency graph statically, the plugin validates 
 
 > **A service may only depend on services in its own scope or an ancestor (longer-lived) scope.**
 
+This base rule applies to the built-in lifecycles on every build: a `singleton` (or any longer-lived service) may never depend on a `transient`.
+
 Using the hierarchy `singleton ▸ session ▸ request ▸ transient`:
 
 - **Safe** (✅): `request` → `session` → `singleton` (depending on an equal- or longer-lived scope is safe).

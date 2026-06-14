@@ -10,7 +10,7 @@ Most TypeScript DI frameworks configure the container **at runtime**. They resol
 
 Alloy moves that work to **build time**. The plugin reads your `@Injectable` classes, constructs the dependency graph during the build, and generates the container as code. That shift produces properties runtime containers can't easily match:
 
-- **Errors surface at build time, not in production.** Circular dependencies and duplicate registrations fail the build — not a request three weeks later.
+- **Errors surface at build time, not in production.** Circular dependencies, duplicate registrations, and captive-dependency leaks (a longer-lived service depending on a shorter-lived one — e.g. a singleton on a transient) fail the build — not a request three weeks later.
 - **Zero runtime reflection.** No `reflect-metadata`, no `emitDecoratorMetadata`, no global polyfill — yet services are still discovered automatically, not hand-registered one by one.
 - **Bundler-native lazy loading.** `Lazy(() => import('./Heavy'))` makes a dependency a real dynamic-import boundary, so your DI graph and your bundler's chunk graph are the same graph. DI participates in code-splitting instead of fighting it.
 - **A minimal, tree-shakeable runtime.** The generated container is little more than a map of factories; opt-in features drop out entirely when unused.

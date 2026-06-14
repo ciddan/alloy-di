@@ -71,7 +71,7 @@ const gedges: [number, number][] = [
 
     <div class="hero-grid">
       <div class="hero-content">
-        <Pill dot>Vite Plugin · DI Framework</Pill>
+        <Pill dot>Build time DI Framework</Pill>
         <h1 class="hero-headline">Build-time</h1>
         <h1 class="hero-headline hero-headline--accent">
           Dependency Injection.

@@ -51,4 +51,4 @@ alloy({
 });
 ```
 
-When set, the plugin runs [scope-stability validation](/guide/scopes#build-time-scope-stability-validation) over the library's discovered services at build time, failing the build on captive dependencies. Unlike the Vite plugin, the Rollup plugin emits no declaration files, so type-safe scope names are only generated in the consuming application that hosts the runtime container.
+The plugin runs [scope-stability validation](/guide/scopes#build-time-scope-stability-validation) over the library's discovered services on every build: the base rule (a longer-lived service may not depend on a shorter-lived one - e.g. a singleton on a transient) always applies. Unlike the Vite plugin, the Rollup plugin emits no declaration files, so type-safe scope names are only generated in the consuming application that hosts the runtime container.
