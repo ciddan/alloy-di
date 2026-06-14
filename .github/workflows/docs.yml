@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    if: startsWith(github.event.release.tag_name, 'alloy-di@')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
