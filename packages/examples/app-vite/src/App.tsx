@@ -2,7 +2,6 @@ import { Suspense, use, useEffect, useRef, useState } from "react";
 
 import { createScope, type Scope } from "alloy-di/scopes";
 import container, { serviceIdentifiers } from "virtual:alloy-container";
-import alloyLogo from "../assets/alloy.svg";
 import { RequestLogger } from "./lib/request-logger";
 import { SessionUser } from "./lib/session-user";
 import styles from "./App.module.scss";
@@ -19,10 +18,6 @@ const consumerServicePromise = container.get(consumerServiceId);
 const analyticsConsumerPromise = container.get(analyticsConsumerId);
 const reportingServicePromise = container.get(reportingServiceId);
 
-const targetLabel =
-  typeof __ALLOY_EXAMPLE_TARGET__ === "string"
-    ? __ALLOY_EXAMPLE_TARGET__
-    : "Vite";
 
 function AppContent() {
   const [count, setCount] = useState<number>(0);
@@ -45,6 +40,7 @@ function AppContent() {
   const handleCreateSession = async () => {
     if (sessionScopeRef.current) {
       addLog("Disposing existing session scope...");
+      analyticsConsumer.shutdown();
       await sessionScopeRef.current.dispose();
       sessionScopeRef.current = null;
     }
@@ -59,12 +55,17 @@ function AppContent() {
       username: user.username,
       createdAt: user.createdAt,
     });
+
+    // Initialize analytics for the active scoped session user
+    analyticsConsumer.initialize(user.username);
+
     addLog(`Session active: user is ${user.username}`);
   };
 
   const handleDisposeSession = async () => {
     if (sessionScopeRef.current) {
       addLog("Disposing session scope...");
+      analyticsConsumer.shutdown();
       await sessionScopeRef.current.dispose();
       sessionScopeRef.current = null;
       setSessionInfo(null);
@@ -91,8 +92,9 @@ function AppContent() {
       addLog(
         `[Request Factory] API client: ${logger.describeApiRequest("/dashboard")}`,
       );
+      const requestUser = await requestScope.get(SessionUser);
       addLog(
-        `[Request Context] Injected SessionUser: ${sessionInfo?.username}`,
+        `[Request Context] Injected SessionUser: ${requestUser.username}`,
       );
 
       logger.log("Request successfully processed.");
@@ -104,7 +106,6 @@ function AppContent() {
   };
 
   useEffect(() => {
-    analyticsConsumer.initialize("user-12345");
     return () => {
       analyticsConsumer.shutdown();
       if (sessionScopeRef.current) {
@@ -148,53 +149,18 @@ function AppContent() {
 
   return (
     <main className={styles.shell}>
-      <section className={styles.hero}>
-        <div className={styles.heroBg} aria-hidden="true">
-          <GraphIllustration />
-        </div>
-        <div className={styles.heroContent}>
-          <span className={styles.pill}>
-            <span className={styles.pillDot}></span>
-            {targetLabel} example app
-          </span>
-          <h1>
-            Build-time
-            <span> dependency injection.</span>
-          </h1>
-          <p>
-            This React demo resolves Alloy services from a generated static
-            container, exercises lazy providers, and creates scoped lifecycles
-            at runtime.
-          </p>
-          <div className={styles.actions}>
-            <button className={styles.primaryButton} onClick={handleClick}>
-              Count is {count}
-            </button>
-            <button className={styles.secondaryButton} onClick={generateReport}>
-              Generate daily report
-            </button>
-          </div>
-        </div>
-        <div className={styles.codeWindow}>
-          <div className={styles.codeBar}>
-            <span></span>
-            <span></span>
-            <span></span>
-            <strong>virtual:alloy-container</strong>
-          </div>
-          <pre>
-            <span className={styles.codeAccent}>const</span> service ={" "}
-            <span className={styles.codeCall}>await</span> container.get(id)
-            {"\n"}
-            <span className={styles.codeAccent}>const</span> scope =
-            createScope(container,{" "}
-            <span className={styles.codeString}>"session"</span>){"\n"}
-            <span className={styles.codeAccent}>const</span> request =
-            scope.createScope(
-            <span className={styles.codeString}>"request"</span>)
-          </pre>
-        </div>
-      </section>
+      <div className={styles.heroBg} aria-hidden="true">
+        <GraphIllustration />
+      </div>
+
+      <div className={styles.actionsBar}>
+        <button className={styles.primaryButton} onClick={handleClick}>
+          Count is {count}
+        </button>
+        <button className={styles.secondaryButton} onClick={generateReport}>
+          Generate daily report
+        </button>
+      </div>
 
       <section className={styles.summaryGrid} aria-label="Resolved services">
         {serviceSummaries.map((item) => (
@@ -286,44 +252,7 @@ function AppContent() {
           </div>
         </article>
       </section>
-
-      <footer className={styles.footer}>
-        <img src={alloyLogo} alt="" width={24} height={24} />
-        <span>DI powered by alloy-di</span>
-      </footer>
     </main>
-  );
-}
-
-function GraphIllustration() {
-  return (
-    <svg viewBox="0 0 520 360" preserveAspectRatio="xMidYMid slice">
-      <g className={styles.graphEdges}>
-        <line x1="150" y1="92" x2="272" y2="56"></line>
-        <line x1="150" y1="92" x2="272" y2="150"></line>
-        <line x1="150" y1="214" x2="272" y2="150"></line>
-        <line x1="150" y1="214" x2="272" y2="252"></line>
-        <line x1="272" y1="56" x2="392" y2="104"></line>
-        <line x1="272" y1="150" x2="392" y2="104"></line>
-        <line x1="272" y1="150" x2="392" y2="206"></line>
-        <line x1="272" y1="252" x2="392" y2="206"></line>
-        <line x1="272" y1="252" x2="392" y2="300"></line>
-        <line x1="392" y1="104" x2="452" y2="58"></line>
-        <line x1="392" y1="206" x2="392" y2="300"></line>
-        <line x1="272" y1="56" x2="452" y2="58"></line>
-      </g>
-      <g className={styles.graphNodes}>
-        <circle cx="150" cy="92" r="4"></circle>
-        <circle cx="150" cy="214" r="4"></circle>
-        <circle cx="272" cy="56" r="4"></circle>
-        <circle cx="272" cy="150" r="6"></circle>
-        <circle cx="272" cy="252" r="4"></circle>
-        <circle cx="392" cy="104" r="5"></circle>
-        <circle cx="392" cy="206" r="4"></circle>
-        <circle cx="392" cy="300" r="4"></circle>
-        <circle cx="452" cy="58" r="3"></circle>
-      </g>
-    </svg>
   );
 }
 
@@ -334,6 +263,63 @@ export function App() {
     >
       <AppContent />
     </Suspense>
+  );
+}
+
+function GraphIllustration() {
+  const gnodes = [
+    { x: 150, y: 92, r: 4 },
+    { x: 150, y: 214, r: 4 },
+    { x: 272, y: 56, r: 4 },
+    { x: 272, y: 150, r: 6, key: true },
+    { x: 272, y: 252, r: 4 },
+    { x: 392, y: 104, r: 5, key: true },
+    { x: 392, y: 206, r: 4 },
+    { x: 392, y: 300, r: 4 },
+    { x: 452, y: 58, r: 3 },
+  ];
+  const gedges: [number, number][] = [
+    [0, 2],
+    [0, 3],
+    [1, 3],
+    [1, 4],
+    [2, 5],
+    [3, 5],
+    [3, 6],
+    [4, 6],
+    [4, 7],
+    [5, 8],
+    [6, 7],
+    [2, 8],
+  ];
+
+  return (
+    <svg viewBox="0 0 520 360" preserveAspectRatio="xMidYMid slice">
+      <g className={styles.graphEdges}>
+        {gedges.map(([a, b], i) => (
+          <line
+            key={`e${i}`}
+            x1={gnodes[a].x}
+            y1={gnodes[a].y}
+            x2={gnodes[b].x}
+            y2={gnodes[b].y}
+            style={{ animationDelay: `${i * 0.18}s` }}
+          />
+        ))}
+      </g>
+      <g className={styles.graphNodes}>
+        {gnodes.map((n, i) => (
+          <circle
+            key={`n${i}`}
+            cx={n.x}
+            cy={n.y}
+            r={n.r}
+            className={n.key ? styles.isKey : undefined}
+            style={{ animationDelay: `${i * 0.22}s` }}
+          />
+        ))}
+      </g>
+    </svg>
   );
 }
 
