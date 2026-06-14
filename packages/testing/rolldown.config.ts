@@ -1,20 +1,19 @@
 import { mkdir, stat } from "node:fs/promises";
 import { defineConfig } from "rolldown";
 import { dts } from "rolldown-plugin-dts";
-import { visualizer } from "rollup-plugin-visualizer";
 
 import pkg from "./package.json" with { type: "json" };
 
 const external = [
+  ...Object.keys(pkg.dependencies ?? {}),
   ...Object.keys(pkg.devDependencies ?? {}),
   ...Object.keys(pkg.peerDependencies ?? {}),
-  "vite",
+  "alloy-di",
+  "alloy-di/runtime",
+  "alloy-di/scopes",
   "vitest",
-  "typescript",
-  "path",
+  "@jest/globals",
   /^node:.*/,
-  "node:url",
-  "zod",
 ];
 
 const distExists = await stat("dist")
@@ -26,15 +25,12 @@ if (!distExists) {
 }
 
 export default defineConfig([
-  // Bundle the main plugin and runtime code
   {
     input: {
-      cli: "src/cli.ts",
-      generate: "src/generate.ts",
-      vite: "src/vite.ts",
-      rollup: "src/rollup.ts",
-      runtime: "src/runtime.ts",
-      scopes: "src/scopes.ts",
+      index: "src/index.ts",
+      "adapters/vitest": "src/adapters/vitest.ts",
+      "adapters/jest": "src/adapters/jest.ts",
+      "adapters/node": "src/adapters/node.ts",
     },
     tsconfig: "./tsconfig.json",
     output: {
@@ -45,17 +41,6 @@ export default defineConfig([
       sourcemap: false,
     },
     external,
-    plugins: [
-      dts(),
-      visualizer({
-        gzipSize: true,
-        filename: "./analytics/bundle-stats.html",
-      }),
-      visualizer({
-        gzipSize: true,
-        filename: "./analytics/bundle-stats.json",
-        template: "raw-data",
-      }),
-    ],
+    plugins: [dts()],
   },
 ]);

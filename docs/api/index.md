@@ -42,9 +42,12 @@ const reportingInstance = await container.get(id);
 
 Use this when leveraging `lazyServices` or when consuming services discovered via manifests, ensuring your lookups remain robust after bundler minification and suppressing the constructor warning for factory-lazy services.
 
-### Testing Helpers (`alloy-di/test`)
+### Testing Helpers (`@alloy-di/testing`)
 
-The testing entrypoint provides utilities for constructing a test-focused container and automocking dependencies.
+The [`@alloy-di/testing`](/guide/testing) package provides utilities for
+constructing a test-focused container and automocking dependencies. Import a
+runner adapter — `@alloy-di/testing/vitest`, `@alloy-di/testing/jest`, or
+`@alloy-di/testing/node` — which wires in the runner's mock function.
 
 - `createTestContainer(options)`: Builds a container with optional `providers`, manual `overrides`, test `scopes`, and `autoMock` targeting a specific `target` class.
   - `providers?: ProviderDefinitions | ProviderDefinitions[]`
@@ -52,11 +55,13 @@ The testing entrypoint provides utilities for constructing a test-focused contai
   - `scopes?: Record<string, { parent?: ServiceScope }>` — same shape as `alloy({ scopes })`; omitted parents default to `"singleton"`.
   - `autoMock?: boolean`
   - `target?: Newable`
-  - Returns handle with `get`, `getToken`, `provideToken`, `provideFactory`, `overrideFactory`, `createScope`, `getMock`, `getMocks`, `restore`.
-- `MockOf<T>`: Typed shape of an auto-generated mock with `spies` and `__target`.
+  - Returns handle with `get`, `getToken`, `provideToken`, `provideFactory`, `overrideFactory`, `createScope`, `getMock`, `getMocks`, `spyOf`, `clearMockSpies`, `restore`.
+- `setupAlloyTesting()`: Registers the runner's `afterEach` hook and auto-restores containers it creates.
+- `MockOf<T, S>`: Typed shape of an auto-generated mock with `spies` and `__target`.
 - `createToken(description?)`: Re-export for convenience in tests.
 
-Vitest is required: `vitest >=4.0.14 <5.0.0`.
+The `alloy-di/test` entry was removed in `alloy-di` 2.0; use
+`@alloy-di/testing/vitest` instead.
 
 See the dedicated guide: [Testing and Mocking with Alloy](../guide/testing.md).
 

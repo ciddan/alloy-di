@@ -1,8 +1,13 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
-import { dependenciesRegistry } from "./lib/decorators";
-import { asClass, asFactory, asValue, lifecycle } from "./lib/providers";
-import { createTestContainer, createToken } from "./test";
+import {
+  asClass,
+  asFactory,
+  asValue,
+  dependenciesRegistry,
+  lifecycle,
+} from "alloy-di/runtime";
+import { createTestContainer, createToken, setupAlloyTesting } from "./vitest";
 
 // Bypass global scope augmentation in library tests.
 // oxlint-disable-next-line no-explicit-any -- test-only custom scope cast.
@@ -15,7 +20,7 @@ function required<T>(value: T | undefined, label: string): T {
   return value;
 }
 
-describe("createTestContainer core functionality", () => {
+describe("vitest createTestContainer core functionality", () => {
   const handles: Array<{ restore(): void }> = [];
 
   afterEach(() => {
@@ -131,7 +136,7 @@ describe("createTestContainer core functionality", () => {
     expect(handle.getToken(Token)).toBe("legacy-value");
   });
 
-  it("exposes autoMock helpers for class dependencies", async () => {
+  it("exposes autoMock helpers backed by Vitest spies", async () => {
     class Leaf {
       ping() {
         return "leaf";
@@ -176,9 +181,6 @@ describe("createTestContainer core functionality", () => {
 
     expect(growSpy).toHaveBeenCalledTimes(1);
 
-    if (!handle.clearMockSpies) {
-      throw new Error("Expected clearMockSpies to be defined.");
-    }
     handle.clearMockSpies();
     expect(growSpy).not.toHaveBeenCalled();
   });
@@ -204,7 +206,7 @@ describe("createTestContainer core functionality", () => {
   });
 });
 
-describe("createTestContainer factory overrides", () => {
+describe("vitest createTestContainer factory overrides", () => {
   const handles: Array<{ restore(): void }> = [];
 
   afterEach(() => {
@@ -459,5 +461,83 @@ describe("createTestContainer factory overrides", () => {
       id: 2,
       message: "hello bob",
     });
+  });
+});
+
+describe("vitest setupAlloyTesting auto-cleanup", () => {
+  const alloyTesting = setupAlloyTesting();
+  class Tracked {}
+
+  it("registers providers within a test", () => {
+    expect(dependenciesRegistry.has(Tracked)).toBe(false);
+
+    alloyTesting.createTestContainer({
+      providers: {
+        services: [asClass(Tracked, { lifecycle: lifecycle.transient() })],
+      },
+    });
+
+    // No manual restore: the afterEach registered by setupAlloyTesting() cleans up.
+    expect(dependenciesRegistry.has(Tracked)).toBe(true);
+  });
+
+  it("auto-restored the previous test's registry mutations", () => {
+    expect(dependenciesRegistry.has(Tracked)).toBe(false);
+  });
+});
+
+describe("vitest setupAlloyTesting unwinds multiple containers in one test", () => {
+  const alloyTesting = setupAlloyTesting();
+  class First {}
+  class Second {}
+
+  it("registers providers across two containers in a single test", () => {
+    expect(dependenciesRegistry.has(First)).toBe(false);
+    expect(dependenciesRegistry.has(Second)).toBe(false);
+
+    // The second container snapshots the registry *after* the first has already
+    // registered First; LIFO cleanup must still return to the clean baseline.
+    alloyTesting.createTestContainer({
+      providers: {
+        services: [asClass(First, { lifecycle: lifecycle.transient() })],
+      },
+    });
+    alloyTesting.createTestContainer({
+      providers: {
+        services: [asClass(Second, { lifecycle: lifecycle.transient() })],
+      },
+    });
+
+    expect(dependenciesRegistry.has(First)).toBe(true);
+    expect(dependenciesRegistry.has(Second)).toBe(true);
+  });
+
+  it("auto-restored every container's registry mutations", () => {
+    expect(dependenciesRegistry.has(First)).toBe(false);
+    expect(dependenciesRegistry.has(Second)).toBe(false);
+  });
+});
+
+describe("vitest direct createTestContainer has no auto-cleanup", () => {
+  class Leaked {}
+
+  afterAll(() => {
+    dependenciesRegistry.delete(Leaked);
+  });
+
+  it("registers providers within a test", () => {
+    expect(dependenciesRegistry.has(Leaked)).toBe(false);
+
+    createTestContainer({
+      providers: {
+        services: [asClass(Leaked, { lifecycle: lifecycle.transient() })],
+      },
+    });
+
+    expect(dependenciesRegistry.has(Leaked)).toBe(true);
+  });
+
+  it("did not auto-restore the previous test (registration persists)", () => {
+    expect(dependenciesRegistry.has(Leaked)).toBe(true);
   });
 });

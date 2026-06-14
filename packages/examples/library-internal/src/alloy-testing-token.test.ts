@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 import { LibraryApiBaseUrl } from "./tokens";
 import { AnalyticsService } from "./analytics-service";
 

@@ -100,7 +100,7 @@ That single choice drives most of Alloy's advantages and most of its gaps.
    constructor.
 
 6. **Testing requires the registry populated.** Runtime containers are trivially
-   unit-testable with `register` + `resolve`. Alloy works (`alloy-di/test`,
+   unit-testable with `register` + `resolve`. Alloy works (`@alloy-di/testing`,
    `overrideInstance`, or direct decoration), but tests run through the plugin
    transform or manual registration — a little more setup.
 

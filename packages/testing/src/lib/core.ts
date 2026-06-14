@@ -1,19 +1,23 @@
 // oxlint-disable no-explicit-any, no-unsafe-type-assertion
 
-export { createToken } from "./lib/types"; // convenience re-export for tests
-export type { MockOf } from "./lib/testing/mocking";
-
-import type { Newable, Token } from "./lib/types";
-import type { ServiceIdentifier } from "./lib/service-identifiers";
-import { Container } from "./lib/container";
-import type { FactoryFn } from "./lib/container";
-import type { ServiceScope } from "./lib/scope";
-import { applyAutoMocks, type MockOf } from "./lib/testing/mocking";
-import { snapshotRegistry, restoreRegistry } from "./lib/testing/registry";
-import { vi } from "vitest";
-import type { ProviderDefinitions } from "./lib/providers";
-import { applyProviders } from "./lib/providers";
-import { createScope, type Scope } from "./scopes";
+import {
+  applyProviders,
+  Container,
+  type FactoryFn,
+  type Newable,
+  type ProviderDefinitions,
+  type ServiceIdentifier,
+  type ServiceScope,
+  type Token,
+} from "alloy-di/runtime";
+import { createScope, type Scope } from "alloy-di/scopes";
+import {
+  applyAutoMocks,
+  type GenericSpy,
+  type MockFnFactory,
+  type MockOf,
+} from "./mocking";
+import { restoreRegistry, snapshotRegistry } from "./registry";
 
 export type FactoryOverrideSpec<T = unknown> = [
   token: Token<T>,
@@ -36,16 +40,27 @@ export interface OverrideSpec {
   factories?: FactoryOverrideSpec[];
 }
 
-export interface CreateTestContainerOptions {
+export interface CreateTestContainerOptions<S = GenericSpy> {
   overrides?: OverrideSpec;
   autoMock?: boolean;
   target?: Newable<unknown>; // focal service for auto-mocking immediate dependencies
   providers?: ProviderDefinitions | ProviderDefinitions[];
   /** Custom scope hierarchy for tests, matching alloy({ scopes }) shape. */
   scopes?: TestScopeHierarchy;
+  /**
+   * Factory used to create spies for auto-mocked methods. Required when
+   * `autoMock` is enabled. Runner adapters (e.g. `@alloy-di/testing/vitest`)
+   * pre-wire this to the runner's mock function.
+   */
+  mockFn?: MockFnFactory<S>;
+  /**
+   * Resets a single spy created by `mockFn`. Used by `clearMockSpies()`.
+   * Runner adapters pre-wire this to the runner's reset semantics.
+   */
+  resetFn?: (spy: S) => void;
 }
 
-export interface TestContainerHandle {
+export interface TestContainerHandle<S = GenericSpy> {
   container: Container;
   get<T>(target: Newable<T> | ServiceIdentifier<T>): Promise<T>;
   getIdentifier?<T>(ctor: Newable<T>): ServiceIdentifier<T>;
@@ -70,21 +85,18 @@ export interface TestContainerHandle {
   /** Placeholder restore hook (future phases may implement overlay stacks). */
   restore(): void;
   /** Retrieve a single class mock (if autoMock enabled). */
-  getMock?<T>(ctor: Newable<T>): MockOf<T> | undefined;
+  getMock?<T>(ctor: Newable<T>): MockOf<T, S> | undefined;
   /** Retrieve multiple class mocks preserving tuple order. */
   getMocks?<T extends readonly Newable<unknown>[]>(
     ctors: T,
   ): {
     [K in keyof T]: T[K] extends Newable<infer I>
-      ? MockOf<I> | undefined
+      ? MockOf<I, S> | undefined
       : never;
   };
   /** Convenience: get a specific method spy from a mock. */
-  spyOf?<T>(
-    ctor: Newable<T>,
-    method: Extract<keyof T, string>,
-  ): ReturnType<typeof vi.fn> | undefined;
-  /** Convenience: reset all mock spies (calls vi.fn().mockReset()). */
+  spyOf?<T>(ctor: Newable<T>, method: Extract<keyof T, string>): S | undefined;
+  /** Convenience: reset all mock spies (requires a `resetFn` binding). */
   clearMockSpies?(): void;
 }
 
@@ -100,18 +112,19 @@ function normalizeScopeHierarchy(
 
 /**
  * Create a test-focused container with manual overrides.
- * - Auto-mocking, when enabled, only mocks class constructor dependencies.
+ * - Auto-mocking, when enabled, only mocks class constructor dependencies and
+ *   requires a `mockFn` binding (supplied directly or by a runner adapter).
  * - Token factories are explicit overrides and are applied after provider blocks.
  */
-export function createTestContainer(
-  opts?: CreateTestContainerOptions | OverrideSpec,
-): TestContainerHandle & {
-  getMock<T>(ctor: Newable<T>): MockOf<T> | undefined;
+export function createTestContainer<S = GenericSpy>(
+  opts?: CreateTestContainerOptions<S> | OverrideSpec,
+): TestContainerHandle<S> & {
+  getMock<T>(ctor: Newable<T>): MockOf<T, S> | undefined;
   getMocks<T extends readonly Newable<unknown>[]>(
     ctors: T,
   ): {
     [K in keyof T]: T[K] extends Newable<infer I>
-      ? MockOf<I> | undefined
+      ? MockOf<I, S> | undefined
       : never;
   };
   provideToken<T>(token: Token<T>, value: T): void;
@@ -126,8 +139,12 @@ export function createTestContainer(
     options?: { lifecycle?: ServiceScope },
   ): void;
   createScope(scopeName: ServiceScope): Scope;
+  spyOf<T>(ctor: Newable<T>, method: Extract<keyof T, string>): S | undefined;
+  clearMockSpies(): void;
 } {
-  // Backward compatibility: allow passing OverrideSpec directly (Phase 1 style)
+  // Backward compatibility: allow passing OverrideSpec directly (Phase 1 style).
+  // `mockFn`/`resetFn` are adapter-injected bindings and intentionally do not
+  // disqualify the legacy shorthand (they are simply unused without autoMock).
   const isLegacy =
     !!opts &&
     !("autoMock" in opts) &&
@@ -135,7 +152,7 @@ export function createTestContainer(
     !("overrides" in opts) &&
     !("providers" in opts) &&
     !("scopes" in opts);
-  const normalizedOpts: CreateTestContainerOptions = isLegacy
+  const normalizedOpts: CreateTestContainerOptions<S> = isLegacy
     ? { overrides: opts as OverrideSpec }
     : (opts ?? {});
   const overrides =
@@ -176,15 +193,24 @@ export function createTestContainer(
     container.overrideInstance(ctor, instance);
   }
 
-  let mocks: Map<Newable<unknown>, MockOf<unknown>> | undefined;
+  const resetFn = normalizedOpts.resetFn;
+  let mocks: Map<Newable<unknown>, MockOf<unknown, S>> | undefined;
   let lazyPatches:
     | Array<{ lazy: any; originalImporter: () => Promise<unknown> }>
     | undefined;
   if (normalizedOpts.autoMock && normalizedOpts.target) {
-    const auto = applyAutoMocks({
+    if (!normalizedOpts.mockFn) {
+      throw new Error(
+        "createTestContainer: `autoMock` requires a `mockFn` factory. " +
+          "Use a runner adapter (e.g. `@alloy-di/testing/vitest`) or pass " +
+          "`mockFn` explicitly.",
+      );
+    }
+    const auto = applyAutoMocks<S>({
       target: normalizedOpts.target,
       container,
       overridesCtors: overriddenCtors,
+      mockFn: normalizedOpts.mockFn,
     });
     mocks = auto.mocks;
     lazyPatches = auto.lazyPatches;
@@ -220,29 +246,29 @@ export function createTestContainer(
     createScope: (scopeName: ServiceScope): Scope => {
       return createScope(container, scopeName);
     },
-    getMock: <T>(ctor: Newable<T>): MockOf<T> | undefined => {
-      return (mocks?.get(ctor) as MockOf<T> | undefined) ?? undefined;
+    getMock: <T>(ctor: Newable<T>): MockOf<T, S> | undefined => {
+      return (mocks?.get(ctor) as MockOf<T, S> | undefined) ?? undefined;
     },
     getMocks: <T extends readonly Newable<unknown>[]>(ctors: T) => {
       return ctors.map((c) => mocks?.get(c) as unknown) as {
         [K in keyof T]: T[K] extends Newable<infer I>
-          ? MockOf<I> | undefined
+          ? MockOf<I, S> | undefined
           : never;
       };
     },
     spyOf: <T>(ctor: Newable<T>, method: Extract<keyof T, string>) => {
-      const m = mocks?.get(ctor) as MockOf<T> | undefined;
+      const m = mocks?.get(ctor) as MockOf<T, S> | undefined;
       const spy = m?.spies[method as Extract<keyof typeof m.spies, string>];
       return spy;
     },
     clearMockSpies: () => {
-      if (!mocks) {
+      if (!mocks || !resetFn) {
         return;
       }
       for (const [, m] of mocks) {
-        const spies = m.spies as Record<string, ReturnType<typeof vi.fn>>;
+        const spies = m.spies as Record<string, S>;
         for (const key of Object.keys(spies)) {
-          spies[key].mockReset();
+          resetFn(spies[key]);
         }
       }
     },

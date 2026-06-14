@@ -1,15 +1,34 @@
 # Testing and Mocking with Alloy
 
-This guide covers the testing utilities exposed by `alloy-di/test` for use with Vitest, including manual overrides, provider application, factory overrides, custom scopes, automocking of dependencies, and lazy-loaded services.
+This guide covers the testing utilities published in the `@alloy-di/testing`
+package, including manual overrides, provider application, factory overrides,
+custom scopes, automocking of dependencies, and lazy-loaded services.
+
+`@alloy-di/testing` ships a runner-neutral core plus thin adapters that wire in
+your test runner's mock function:
+
+- `@alloy-di/testing/vitest` — wires `vi.fn` (Vitest).
+- `@alloy-di/testing/jest` — wires `jest.fn` (`@jest/globals`).
+- `@alloy-di/testing/node` — wires `mock.fn()` (`node:test`).
+- `@alloy-di/testing` — the runner-neutral core; use it directly only if you
+  supply your own `mockFn`.
+
+> [!NOTE]
+> The `alloy-di/test` entry was **removed in `alloy-di` 2.0**. Use a
+> `@alloy-di/testing` adapter instead. See
+> [Migrating from `alloy-di/test`](#migrating-from-alloy-di-test).
 
 ## Prerequisites
 
-- Vitest peer dependency: `vitest >=4.0.14 <5.0.0`
-- Install and configure Vitest in your project.
+- Install `@alloy-di/testing` alongside `alloy-di`.
+- Install and configure a supported test runner. For Vitest, the peer range is
+  `vitest >=4.0.14 <5.0.0`.
 
-## Module: `alloy-di/test`
+## Module: `@alloy-di/testing/vitest`
 
-The testing entry provides helpers to build a container tailored for tests.
+The adapter entry provides helpers to build a container tailored for tests. The
+Vitest adapter is used throughout this guide; the Jest and `node:test` adapters
+expose the identical API.
 
 ### `createTestContainer(options?)`
 
@@ -20,7 +39,8 @@ Options:
 - `overrides?: { instances?: Array<[Newable, instance]>; tokens?: Array<[Token<T>, T]>; factories?: Array<[Token<T>, FactoryFn<T>, { lifecycle? }?]> }`
 - `providers?: ProviderDefinitions | ProviderDefinitions[]` — apply provider blocks to the container.
 - `scopes?: Record<string, { parent?: ServiceScope }>` — register a test-only custom scope hierarchy, matching the `alloy({ scopes })` shape.
-- `autoMock?: boolean` — enable automocking.
+- `autoMock?: boolean` — enable automocking. The runner adapter supplies the
+  underlying `mockFn`; the runner-neutral core requires you to pass one.
 - `target?: Newable` — the focal class whose dependency graph will be traversed for automocking.
 
 Returned handle:
@@ -34,14 +54,45 @@ Returned handle:
 - `getMock<T>(ctor: Newable<T>): MockOf<T> | undefined` — get a specific class mock.
 - `getMocks<T extends readonly Newable[]>(ctors: T): [...]` — tuple-preserving batch mock retrieval.
 - `restore(): void` — restores the DI registry and any patched lazy importers; call this after each test.
+- `clearMockSpies(): void` — resets every auto-mock spy using the runner's reset semantics.
+- `spyOf<T>(ctor, method): Spy | undefined` — retrieve a single method spy.
 
-### `MockOf<T>`
+### `setupAlloyTesting()`
 
-A typed mock instance for a class. Its `spies` map contains Vi spies for prototype methods, and fields mirror callable methods for ergonomic usage.
+Each adapter also exports `setupAlloyTesting()`. Call it once per test file (or
+in a shared setup file) to register the runner's `afterEach` hook. Containers
+created through its returned `createTestContainer` are automatically restored and
+cleared after every test, so you don't have to call `restore()` yourself:
 
 ```ts
-export type MockOf<T> = Partial<T> & {
-  spies: Record<Extract<MethodKeys<T>, string>, ReturnType<typeof vi.fn>>;
+import { setupAlloyTesting } from "@alloy-di/testing/vitest";
+
+const alloyTesting = setupAlloyTesting();
+
+it("works", async () => {
+  const test = alloyTesting.createTestContainer({
+    autoMock: true,
+    target: MyService,
+  });
+  const svc = await test.get(MyService);
+  // ... assertions; no manual restore() needed
+});
+```
+
+Importing an adapter never registers test hooks on its own — only
+`setupAlloyTesting()` does. Containers created with the adapter's top-level
+`createTestContainer` are **not** auto-cleaned; call `restore()` yourself.
+
+### `MockOf<T, S>`
+
+A typed mock instance for a class. Its `spies` map contains runner spies for
+prototype methods, and fields mirror callable methods for ergonomic usage. The
+`S` parameter is the runner's spy type (e.g. Vitest's `Mock`), supplied by the
+adapter so spies keep full runner-specific typing.
+
+```ts
+export type MockOf<T, S = GenericSpy> = Partial<T> & {
+  spies: Record<Extract<MethodKeys<T>, string>, S>;
   __target: Newable<T>;
 };
 ```
@@ -51,7 +102,7 @@ export type MockOf<T> = Partial<T> & {
 You can manually override instances and token values for deterministic tests.
 
 ```ts
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 import { defineProviders } from "alloy-di/runtime";
 import providers from "./providers";
 import { EventTracker } from "./event-tracker";
@@ -76,7 +127,7 @@ or when a test needs to construct a token value lazily. The tuple mirrors
 `container.provideFactory`: token, factory function, and optional lifecycle.
 
 ```ts
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 import { lifecycle } from "alloy-di/runtime";
 import { ApiClientToken } from "./tokens";
 import { EventTracker } from "./event-tracker";
@@ -117,7 +168,7 @@ When code under test uses custom lifecycles, pass the same `scopes` block shape
 you use in `alloy({ scopes })`. Omitted parents default to `"singleton"`.
 
 ```ts
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 import { CurrentUserToken, GreetingToken } from "./tokens";
 import { RequestConsumer } from "./request-consumer";
 
@@ -204,7 +255,7 @@ Recommended usage (Vitest):
 
 ```ts
 import { afterEach } from "vitest";
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 
 describe("my feature", () => {
   it("works with overrides and mocks", async () => {
@@ -233,4 +284,19 @@ See `packages/examples/library-internal/src` for examples:
 - Factory overrides are token-keyed and explicit; `autoMock` does not replace them.
 - Test scopes use the same hierarchy shape as plugin scopes: `{ session: {}, request: { parent: "session" } }`.
 - `get` returns a Promise because services may be lazy-loaded.
-- Vitest must be installed in projects using `alloy-di/test`.
+- A supported test runner must be installed for the adapter you import.
+
+## Migrating from `alloy-di/test`
+
+`alloy-di/test` was removed in `alloy-di` 2.0. Install `@alloy-di/testing` and
+update the import specifier:
+
+```ts
+// Before (alloy-di 1.x)
+import { createTestContainer } from "alloy-di/test";
+
+// After
+import { createTestContainer } from "@alloy-di/testing/vitest";
+```
+
+The API is identical — only the import specifier changes.

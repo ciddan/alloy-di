@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dependenciesRegistry } from "../decorators";
-import { Container } from "../container";
-import { Lazy } from "../lazy";
-import type { Newable } from "../types";
+import { Container, dependenciesRegistry, Lazy } from "alloy-di/runtime";
+import type { Newable } from "alloy-di/runtime";
 import { applyAutoMocks, mockClass } from "./mocking";
 import type { MockOf } from "./mocking";
 
 type RegistryEntry = Parameters<(typeof dependenciesRegistry)["set"]>;
+
+const mockFn = () => vi.fn();
 
 describe("mockClass", () => {
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("mockClass", () => {
       nonFunction = "should not be copied";
     }
 
-    const { target, mock } = mockClass(ExampleService);
+    const { target, mock } = mockClass(ExampleService, mockFn);
 
     expect(target).toBe(ExampleService);
 
@@ -101,6 +101,7 @@ describe("applyAutoMocks", () => {
       target: Root,
       container,
       overridesCtors: new Set<Newable<unknown>>(),
+      mockFn,
     });
 
     expect(overrideSpy).toHaveBeenCalledTimes(2);
@@ -147,11 +148,60 @@ describe("applyAutoMocks", () => {
       target: Root,
       container,
       overridesCtors: overrides,
+      mockFn,
     });
 
     expect(overrideSpy).toHaveBeenCalledTimes(1);
     expect(overrideSpy).toHaveBeenCalledWith(Leaf, expect.any(Object));
     expect(result.mocks.has(Branch)).toBe(false);
     expect(result.mocks.has(Leaf)).toBe(true);
+  });
+
+  it("visits shared dependencies once in a diamond graph", () => {
+    class Shared {}
+    class Left {}
+    class Right {}
+    class Root {}
+
+    dependenciesRegistry.set(Shared, { dependencies: () => [] });
+    dependenciesRegistry.set(Left, { dependencies: () => [Shared] });
+    dependenciesRegistry.set(Right, { dependencies: () => [Shared] });
+    dependenciesRegistry.set(Root, { dependencies: () => [Left, Right] });
+
+    const container = new Container();
+    const result = applyAutoMocks({
+      target: Root,
+      container,
+      overridesCtors: new Set<Newable<unknown>>(),
+      mockFn,
+    });
+
+    expect(result.mocks.has(Left)).toBe(true);
+    expect(result.mocks.has(Right)).toBe(true);
+    expect(result.mocks.has(Shared)).toBe(true);
+  });
+
+  it("returns the real constructor for an overridden lazy dependency", async () => {
+    class LazyOverridden {
+      run() {
+        return "real";
+      }
+    }
+    class Root {}
+
+    const lazy = Lazy(() => Promise.resolve(LazyOverridden));
+    dependenciesRegistry.set(Root, { dependencies: () => [lazy] });
+
+    const container = new Container();
+    const result = applyAutoMocks({
+      target: Root,
+      container,
+      overridesCtors: new Set<Newable<unknown>>([LazyOverridden]),
+      mockFn,
+    });
+
+    const resolved = await lazy.importer();
+    expect(resolved).toBe(LazyOverridden);
+    expect(result.mocks.has(LazyOverridden)).toBe(false);
   });
 });

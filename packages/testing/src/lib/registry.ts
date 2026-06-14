@@ -1,10 +1,13 @@
 // oxlint-disable no-explicit-any, no-unsafe-type-assertion
 
-import { dependenciesRegistry } from "../decorators";
-import type { Newable, Token } from "../types";
-import { isToken } from "../types";
-import { Lazy } from "../lazy";
-import type { ServiceScope } from "../scope";
+import {
+  dependenciesRegistry,
+  isToken,
+  type Lazy,
+  type Newable,
+  type ServiceScope,
+  type Token,
+} from "alloy-di/runtime";
 
 // Snapshot structure type re-exposed for potential advanced usage.
 export type RegistrySnapshot = Map<
