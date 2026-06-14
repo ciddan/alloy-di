@@ -3,10 +3,9 @@
 **/node_modules
 
 # Build output
-/dist
 /.turbo
 **/.turbo
-**/dist
+**/dist*
 packages/**/analytics
 coverage/
 packages/**/tsconfig.tsbuildinfo
