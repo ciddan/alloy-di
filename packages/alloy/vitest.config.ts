@@ -5,7 +5,6 @@ export default defineConfig({
     coverage: {
       exclude: [
         ...(configDefaults.coverage.exclude ?? []),
-        "./src/test.ts",
         "./src/rollup.ts",
         "./src/runtime.ts",
         "./src/vite.ts",

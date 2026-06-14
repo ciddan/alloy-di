@@ -14,9 +14,9 @@ your test runner's mock function:
   supply your own `mockFn`.
 
 > [!NOTE]
-> The previous entry `alloy-di/test` is **deprecated**. It now re-exports
-> `@alloy-di/testing/vitest` and will be removed in the next major release.
-> See [Migrating from `alloy-di/test`](#migrating-from-alloy-di-test).
+> The `alloy-di/test` entry was **removed in `alloy-di` 2.0**. Use a
+> `@alloy-di/testing` adapter instead. See
+> [Migrating from `alloy-di/test`](#migrating-from-alloy-di-test).
 
 ## Prerequisites
 
@@ -288,16 +288,15 @@ See `packages/examples/library-internal/src` for examples:
 
 ## Migrating from `alloy-di/test`
 
-`alloy-di/test` is deprecated and now re-exports `@alloy-di/testing/vitest`,
-so existing tests keep working unchanged. To migrate, install `@alloy-di/testing`
-and update the import specifier:
+`alloy-di/test` was removed in `alloy-di` 2.0. Install `@alloy-di/testing` and
+update the import specifier:
 
 ```ts
-// Before
+// Before (alloy-di 1.x)
 import { createTestContainer } from "alloy-di/test";
 
 // After
 import { createTestContainer } from "@alloy-di/testing/vitest";
 ```
 
-The API is identical. `alloy-di/test` will be removed in the next major release.
+The API is identical — only the import specifier changes.

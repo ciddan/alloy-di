@@ -1,6 +1,6 @@
 ---
 "@alloy-di/testing": major
-"alloy-di": minor
+"alloy-di": major
 ---
 
 Extract the test-container utilities into a new published package,
@@ -16,8 +16,15 @@ Each adapter exposes both a direct `createTestContainer` and a hook-registering
 `setupAlloyTesting()` for automatic per-test cleanup. Importing an adapter never
 registers test hooks on its own.
 
-`alloy-di/test` is now **deprecated**: it re-exports `@alloy-di/testing/vitest`,
-preserving today's zero-config Vitest behavior, and will be removed in the next
-major release. Migrate imports from `alloy-di/test` to
-`@alloy-di/testing/vitest`. Using the deprecated entry requires installing
-`@alloy-di/testing`.
+**BREAKING (`alloy-di`):** the `alloy-di/test` entry has been **removed**.
+Migrate testing imports to a `@alloy-di/testing` adapter:
+
+```ts
+// Before
+import { createTestContainer } from "alloy-di/test";
+// After
+import { createTestContainer } from "@alloy-di/testing/vitest";
+```
+
+`alloy-di` no longer depends on a test runner at all (the `vitest` peer
+dependency has been dropped); `@alloy-di/testing` owns that coupling.

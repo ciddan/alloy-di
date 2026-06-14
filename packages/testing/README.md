@@ -41,7 +41,7 @@ Importing an adapter never registers test hooks on its own — only `setupAlloyT
 
 ## Migration from `alloy-di/test`
 
-`alloy-di/test` is deprecated and re-exports `@alloy-di/testing/vitest`. Replace:
+`alloy-di/test` was removed in `alloy-di` 2.0. Replace:
 
 ```ts
 import { createTestContainer } from "alloy-di/test";
@@ -53,4 +53,4 @@ with:
 import { createTestContainer } from "@alloy-di/testing/vitest";
 ```
 
-`alloy-di/test` will be removed in the next major release.
+The API is identical — only the import specifier changes.

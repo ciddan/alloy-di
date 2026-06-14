@@ -60,8 +60,8 @@ runner adapter — `@alloy-di/testing/vitest`, `@alloy-di/testing/jest`, or
 - `MockOf<T, S>`: Typed shape of an auto-generated mock with `spies` and `__target`.
 - `createToken(description?)`: Re-export for convenience in tests.
 
-The deprecated `alloy-di/test` entry re-exports `@alloy-di/testing/vitest` and
-will be removed in the next major release.
+The `alloy-di/test` entry was removed in `alloy-di` 2.0; use
+`@alloy-di/testing/vitest` instead.
 
 See the dedicated guide: [Testing and Mocking with Alloy](../guide/testing.md).
 
