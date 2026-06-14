@@ -13,4 +13,4 @@ export {
   type TestScopeHierarchy,
 } from "./lib/core";
 
-export type { AnySpy, GenericSpy, MockFnFactory, MockOf } from "./lib/mocking";
+export type { GenericSpy, MockFnFactory, MockOf } from "./lib/mocking";

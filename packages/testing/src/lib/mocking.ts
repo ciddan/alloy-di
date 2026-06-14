@@ -22,9 +22,6 @@ export type GenericSpy = ((...args: any[]) => any) & {
   mock?: { calls: any[][] };
 };
 
-/** Alias for {@link GenericSpy}. */
-export type AnySpy = GenericSpy;
-
 /** Factory that produces a fresh spy function (e.g. `vi.fn`, `jest.fn`). */
 export type MockFnFactory<S = GenericSpy> = () => S;
 

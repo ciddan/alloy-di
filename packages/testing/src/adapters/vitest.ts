@@ -68,7 +68,6 @@ export function setupAlloyTesting() {
 
 export { createToken } from "../index";
 export type {
-  AnySpy,
   CreateTestContainerOptions,
   FactoryOverrideSpec,
   GenericSpy,

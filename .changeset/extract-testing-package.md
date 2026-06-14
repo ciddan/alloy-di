@@ -7,7 +7,7 @@ Extract the test-container utilities into a new published package,
 `@alloy-di/testing`, with a runner-neutral core and thin adapters:
 
 - `@alloy-di/testing` — runner-neutral `createTestContainer` (supply your own
-  `mockFn`), plus `MockOf`, `GenericSpy`/`AnySpy`, and `MockFnFactory` types.
+  `mockFn`), plus `MockOf`, `GenericSpy`, and `MockFnFactory` types.
 - `@alloy-di/testing/vitest` — wires `vi.fn`.
 - `@alloy-di/testing/jest` — wires `jest.fn` from `@jest/globals`.
 - `@alloy-di/testing/node` — wires `mock.fn()` from `node:test`.
