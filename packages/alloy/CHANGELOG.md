@@ -1,5 +1,13 @@
 # alloy-di
 
+## 1.5.0
+
+### Minor Changes
+
+- 3e53af3: Add factory providers for token-bound runtime values, including imperative
+  `provideFactory`, declarative `asFactory`, scoped factory lifecycles, test
+  container overrides, visualizer support, documentation, and example usage.
+
 ## 1.4.0
 
 ### Minor Changes
