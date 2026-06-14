@@ -99,6 +99,22 @@ describe("Container testing features", () => {
       expect(viaIdentifier).toBe(fake);
     });
 
+    it("honors a deliberately falsy override instead of re-constructing", async () => {
+      @Injectable()
+      class Service {
+        readonly real = true;
+      }
+
+      const container = new Container();
+      // A null/falsy mock must short-circuit resolution rather than falling
+      // through to construct the real service.
+      container.overrideInstance(Service, null as unknown as Service);
+
+      const resolved = await container.get(Service);
+
+      expect(resolved).toBeNull();
+    });
+
     it("replaces cached singleton instances when an override is provided", async () => {
       @Injectable("singleton")
       class Config {

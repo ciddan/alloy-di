@@ -134,6 +134,10 @@ export class Container implements ResolutionContext {
     return this.singletons.get(target);
   }
 
+  public hasCached(target: Constructor): boolean {
+    return this.singletons.has(target);
+  }
+
   public setCached(target: Constructor, instance: unknown): void {
     this.singletons.set(target, instance);
   }
@@ -385,11 +389,11 @@ export class Container implements ResolutionContext {
     resolutionStack: Constructor[],
     context: ResolutionContext,
   ): Promise<T> {
-    // Instance override fast path (test/mocking support)
-    const overridden = this.instanceOverrides.get(target);
-    if (overridden) {
+    // Instance override fast path (test/mocking support). Presence-based so a
+    // deliberately falsy override (e.g. `null`, `0`, `""`) still short-circuits.
+    if (this.instanceOverrides.has(target)) {
       // oxlint-disable-next-line no-unsafe-type-assertion -- caller supplies correctly typed instance.
-      return overridden as T;
+      return this.instanceOverrides.get(target) as T;
     }
     // Guard: Detect circular dependencies
     if (resolutionStack.includes(target)) {
@@ -473,10 +477,9 @@ export class Container implements ResolutionContext {
     resolutionStack: Constructor[],
     targetCtx: ResolutionContext,
   ): Promise<T> {
-    const cached = targetCtx.getCached(target);
-    if (cached) {
+    if (targetCtx.hasCached(target)) {
       // oxlint-disable-next-line no-unsafe-type-assertion
-      return cached as T;
+      return targetCtx.getCached(target) as T;
     }
 
     const pending = targetCtx.getPending(target);

@@ -11,9 +11,9 @@ differentiated, and where more established containers still have the edge.
 
 Nearly every mainstream TypeScript DI container resolves and validates its graph
 **at runtime**. Alloy is one of the few that does the work **at build time** — a
-Vite/Rollup plugin statically discovers `@Injectable`/`@Singleton` classes,
-generates the container as a virtual module, and bakes the dependency graph into
-generated code.
+build plugin (Vite, webpack, or Rspack) statically discovers
+`@Injectable`/`@Singleton` classes, generates the container as a virtual module,
+and bakes the dependency graph into generated code.
 
 That single choice drives most of Alloy's advantages and most of its gaps.
 
@@ -28,20 +28,20 @@ That single choice drives most of Alloy's advantages and most of its gaps.
 | Build-time validation (cycles/dupes)  | **Yes**                                       | No                              | No                             | No                            | No                    | No                             | No                                         |
 | Bundler-native code-splitting / lazy  | **Yes (`Lazy(() => import())`)**              | No                              | No                             | No                            | No                    | No                             | No                                         |
 | Dependency-graph visualization        | **Yes (Mermaid)**                             | No                              | No                             | No                            | No                    | No                             | No                                         |
-| Scopes                                | singleton / transient (hierarchical proposed) | singleton / transient / request | singleton / transient / scoped | default / request / transient | singleton / transient | singleton / scoped / transient | singleton / scoped / transient / container |
+| Scopes                                | singleton / transient / hierarchical (custom) | singleton / transient / request | singleton / transient / scoped | default / request / transient | singleton / transient | singleton / scoped / transient | singleton / scoped / transient / container |
 | Interceptors / AOP                    | Proposed                                      | Middleware                      | No                             | Interceptors (framework)      | No                    | No                             | No                                         |
 | Multi-injection / tagged / contextual | **No**                                        | Yes (rich)                      | Limited                        | Via modules                   | Limited               | Limited                        | Limited                                    |
 | Sync resolution                       | **No (async `get`)**                          | Yes                             | Yes                            | Yes                           | Yes                   | Yes                            | Yes                                        |
-| Primary target                        | **Frontend / Vite**                           | Backend                         | Either                         | Backend (Nest)                | Backend               | Backend / Node                 | Frontend                                   |
+| Primary target                        | **Frontend (Vite / webpack / Rspack)**        | Backend                         | Either                         | Backend (Nest)                | Backend               | Backend / Node                 | Frontend                                   |
 | Runtime footprint                     | **Minimal, tree-shakeable**                   | Heavy                           | Light                          | Heavy                         | Medium                | Medium                         | Tiny                                       |
 
 ## Where Alloy wins
 
 1. **Fail at build, not in production.** Circular dependencies and duplicate
    registrations are caught during the build. Every runtime container only
-   throws when the offending path is first resolved. The proposed scope-stability
-   validation extends this to captive-dependency bugs — a class of error other
-   containers cannot catch statically at all.
+   throws when the offending path is first resolved. Scope-stability validation
+   extends this to captive-dependency bugs — a class of error other containers
+   cannot catch statically at all.
 
 2. **Bundler-native lazy loading and code-splitting.**
    `Lazy(() => import('./Heavy'))` makes a dependency a real dynamic-import
@@ -77,9 +77,9 @@ That single choice drives most of Alloy's advantages and most of its gaps.
    battle-tested with large communities and many integrations. Alloy is early,
    with a smaller surface and fewer escape hatches when you hit an edge case.
 
-2. **Build-step lock-in.** Because resolution is build-time, Alloy needs the
-   Vite/Rollup plugin. Runtime containers work anywhere — plain Node, `ts-node`,
-   Deno, a REPL, a serverless function with no bundling.
+2. **Build-step lock-in.** Because resolution is build-time, Alloy needs a build
+   plugin (Vite, webpack, or Rspack). Runtime containers work anywhere — plain
+   Node, `ts-node`, Deno, a REPL, a serverless function with no bundling.
 
 3. **Async-only resolution.** `container.get()` returns a `Promise`, a
    deliberate consequence of supporting lazy dynamic imports. Most competitors
@@ -112,15 +112,15 @@ dependency graph.** In that niche its advantages — build-time validation,
 bundler-native lazy loading, no reflect-metadata, tiny runtime — are
 differentiated and hard to replicate with a runtime container.
 
-- **Choose Alloy** for Vite/Rollup frontend apps that care about bundle size,
-  lazy loading, and catching wiring errors at build time.
+- **Choose Alloy** for Vite, webpack, or Rspack frontend apps that care about
+  bundle size, lazy loading, and catching wiring errors at build time.
 - **Choose Inversify / Nest** when you need rich runtime features
   (multi-injection, contextual bindings, request scopes, mature AOP) or are in a
   backend framework.
 - **Choose tsyringe / Awilix / Brandi / Ditox** when you want a small runtime
   container with synchronous resolution and zero build-step coupling.
 
-Recent additions (hierarchical scopes, factory providers) and the remaining
-interceptors proposal close the most conspicuous breadth gaps **without**
-surrendering the build-time-first identity — each validates or generates code at
+Hierarchical scopes and factory providers close the most conspicuous breadth
+gaps — and the remaining interceptors proposal aims to do the same — **without**
+surrendering the build-time-first identity: each validates or generates code at
 build time rather than bolting on runtime machinery.

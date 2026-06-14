@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Alloy",
-  description: "Build-time Dependency Injection for Vite",
+  description: "Build-time Dependency Injection",
   base: "/",
   head: [
     ["link", { rel: "icon", href: "/favicon.ico", sizes: "48x48" }],
@@ -62,6 +62,7 @@ export default defineConfig({
         items: [
           { text: "What is Alloy?", link: "/guide/what-is-alloy" },
           { text: "Getting Started", link: "/guide/getting-started" },
+          { text: "Migrating from v1", link: "/guide/migration-v1" },
         ],
       },
       {
@@ -82,12 +83,6 @@ export default defineConfig({
           { text: "Dependency Graph", link: "/guide/visualization" },
           { text: "Internal Libraries", link: "/guide/libraries" },
           { text: "Testing & Mocking", link: "/guide/testing" },
-        ],
-      },
-      {
-        text: "Advanced",
-        items: [
-          { text: "Plugin Architecture", link: "/advanced/architecture" },
         ],
       },
       {

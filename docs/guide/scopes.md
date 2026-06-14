@@ -12,14 +12,13 @@ Alloy's core runtime provides `singleton` and `transient`. Hierarchical scopes a
 
 Every lifecycle has a position in a hierarchy from longest-lived to shortest-lived:
 
-```
-singleton  (root — implicit, always present)
-   ▼
- session   (custom scope)
-   ▼
- request   (custom scope)
-   ▼
-transient  (leaf — implicit, never cached)
+```mermaid
+graph TD
+  singleton["singleton — implicit root"]
+  session["session — custom scope"]
+  request["request — custom scope"]
+  transient["transient — implicit leaf"]
+  singleton --> session --> request --> transient
 ```
 
 - **`singleton`** is the implicit **root**: it always bubbles up to and caches on the root `Container`.
@@ -142,6 +141,10 @@ When this happens, the shorter-lived object is captured and leaks: it stays aliv
 Because Alloy builds the full dependency graph statically, the plugin validates the lattice at build time:
 
 > **A service may only depend on services in its own scope or an ancestor (longer-lived) scope.**
+
+"Longer-lived" is precisely the **ancestor** relationship you declare through each scope's `parent`; Alloy never infers it. Scopes on different branches of the hierarchy — neither an ancestor of the other — are incomparable, and a dependency between them is rejected in **either** direction. Only a service's own scope or one of its declared ancestors is allowed.
+
+This base rule applies to the built-in lifecycles on every build: a `singleton` (or any longer-lived service) may never depend on a `transient`.
 
 Using the hierarchy `singleton ▸ session ▸ request ▸ transient`:
 

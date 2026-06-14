@@ -175,3 +175,69 @@ describe("loadVirtualContainerModule input isolation", () => {
     expect(mermaid.startsWith(`%% ${GENERATED_FILE_NOTICE}\n`)).toBe(true);
   });
 });
+
+/**
+ * As of 2.0 the base scope-stability rule (a longer-lived service may not
+ * depend on a shorter-lived one) is always enforced — including the built-in
+ * lifecycles, with no `scopes` config required.
+ */
+function singletonDependingOnTransient(): DiscoveredMeta[] {
+  return [
+    {
+      className: "Helper",
+      filePath: "/src/helper.ts",
+      metadata: { scope: "transient", dependencies: [] },
+    },
+    {
+      className: "Service",
+      filePath: "/src/service.ts",
+      metadata: {
+        scope: "singleton",
+        dependencies: [
+          {
+            expression: "Helper",
+            referencedIdentifiers: ["Helper"],
+            isLazy: false,
+          },
+        ],
+      },
+      referencedImports: [
+        { name: "Helper", path: "/src/helper.ts", originalName: "Helper" },
+      ],
+    },
+  ];
+}
+
+describe("scope stability enforcement without a scopes config", () => {
+  const baseOptions = () => ({
+    lazyReferencedClassKeys: new Set<string>(),
+    manifests: [],
+    providerImportPaths: [],
+    factoryProviders: [],
+    lazyServiceKeys: new Set<string>(),
+    packageName: "test-pkg",
+    resolvedRoot: "/",
+    containerDeclarationDir: makeOutDir(),
+    resolvedVisualization: null,
+  });
+
+  it("rejects a singleton depending on a transient even with no scopes config", async () => {
+    await expect(
+      loadVirtualContainerModule({
+        localMetas: singletonDependingOnTransient(),
+        ...baseOptions(),
+      }),
+    ).rejects.toThrow(/scope stability violation/i);
+  });
+
+  it("allows a singleton depending on a singleton", async () => {
+    const metas = singletonDependingOnTransient();
+    metas[0].metadata.scope = "singleton";
+    await expect(
+      loadVirtualContainerModule({
+        localMetas: metas,
+        ...baseOptions(),
+      }),
+    ).resolves.toBeDefined();
+  });
+});

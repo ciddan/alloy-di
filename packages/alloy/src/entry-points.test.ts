@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { describe, it, expect } from "vitest";
 import * as runtime from "./runtime";
 import * as vitePlugin from "./vite";
@@ -59,6 +60,36 @@ describe("Package Entry Points", () => {
     it("exports declaration generation API", () => {
       expect(generateEntry.generate).toBeDefined();
       expect(typeof generateEntry.generate).toBe("function");
+    });
+  });
+
+  describe("package manifest", () => {
+    const pkg = createRequire(import.meta.url)("../package.json") as {
+      main?: string;
+      module?: string;
+      types?: string;
+      exports: Record<string, unknown>;
+    };
+
+    it("exposes no bare root entry", () => {
+      expect(pkg.exports["."]).toBeUndefined();
+      expect(pkg.main).toBeUndefined();
+      expect(pkg.module).toBeUndefined();
+      expect(pkg.types).toBeUndefined();
+    });
+
+    it("exports every built subpath", () => {
+      expect(Object.keys(pkg.exports).toSorted()).toEqual(
+        [
+          "./generate",
+          "./rollup",
+          "./rspack",
+          "./runtime",
+          "./scopes",
+          "./vite",
+          "./webpack",
+        ].toSorted(),
+      );
     });
   });
 });

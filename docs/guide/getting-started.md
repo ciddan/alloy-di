@@ -8,7 +8,9 @@ pnpm add -D alloy-di
 
 ## Usage
 
-### 1. Configure Vite
+### 1. Configure your bundler
+
+Alloy ships plugins for Vite, webpack, and Rspack. This guide uses Vite; for the others see [Webpack / Rspack configuration](/config/bundler-plugins) — the rest of the guide is identical, only the plugin wiring differs.
 
 Add the `alloy` plugin to your `vite.config.ts` file.
 

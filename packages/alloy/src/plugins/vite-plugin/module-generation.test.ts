@@ -407,7 +407,9 @@ describe("Vite Plugin Alloy - module generation", () => {
           exportName: "Dep",
           importPath: "@scope/lib/dep",
           symbolKey: "alloy:@scope/lib/dep#Dep",
-          scope: "transient" as const,
+          // Singleton so the singleton Consumer's dependency satisfies the
+          // scope-stability rule (a singleton may not capture a transient).
+          scope: "singleton" as const,
           deps: [],
           lazyDeps: [],
         },
