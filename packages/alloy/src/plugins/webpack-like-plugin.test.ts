@@ -45,13 +45,17 @@ function makeRoot(): string {
   return root;
 }
 
-function makeCompiler(root: string) {
+function makeCompiler(root: string, mode: string | undefined = "development") {
   return {
     context: root,
     options: {
       context: root,
-      mode: "development",
-      resolve: {},
+      mode,
+      resolve: {} as {
+        alias?:
+          | Record<string, string>
+          | { name?: string; alias?: string | false | string[] }[];
+      },
     },
     hooks: {
       beforeCompile: new Hook(),
@@ -64,6 +68,13 @@ function makeCompiler(root: string) {
 function getAlias(compiler: ReturnType<typeof makeCompiler>, key: string) {
   return (compiler.options.resolve as { alias?: Record<string, string> })
     .alias?.[key];
+}
+
+function webpackCachePath(root: string): string {
+  return path.join(
+    root,
+    "node_modules/.cache/alloy-di/webpack-virtual-container.js",
+  );
 }
 
 afterEach(() => {
@@ -124,11 +135,77 @@ describe("webpack-like Alloy plugins", () => {
     await compiler.hooks.normalModuleFactory.call(factory);
     await beforeResolve.call(request);
 
-    expect(request.request).toBe(
-      path.join(
-        root,
-        "node_modules/.cache/alloy-di/webpack-virtual-container.js",
-      ),
+    expect(request.request).toBe(webpackCachePath(root));
+  });
+
+  it("writes a well-formed container module to the cache file", async () => {
+    const root = makeRoot();
+    const compiler = makeCompiler(root);
+
+    webpackAlloy({ sourceDirs: ["src"] }).apply(compiler);
+    await compiler.hooks.beforeCompile.call();
+
+    const code = fs.readFileSync(webpackCachePath(root), "utf-8");
+    expect(code).toContain("from 'alloy-di/runtime'");
+    expect(code).toContain("Container");
+    expect(code).toContain("dependenciesRegistry.set");
+    expect(code).toContain("{ ctor: WebpackService");
+    expect(code).toContain("export default container");
+  });
+
+  it("injects the bundler mode into the generated module", async () => {
+    const devRoot = makeRoot();
+    const devCompiler = makeCompiler(devRoot, "development");
+    webpackAlloy().apply(devCompiler);
+    await devCompiler.hooks.beforeCompile.call();
+    expect(fs.readFileSync(webpackCachePath(devRoot), "utf-8")).toContain(
+      "setEnvDetectionOverrides({ isDev: true })",
     );
+
+    const prodRoot = makeRoot();
+    const prodCompiler = makeCompiler(prodRoot, "production");
+    webpackAlloy().apply(prodCompiler);
+    await prodCompiler.hooks.beforeCompile.call();
+    expect(fs.readFileSync(webpackCachePath(prodRoot), "utf-8")).toContain(
+      "setEnvDetectionOverrides({ isDev: false })",
+    );
+  });
+
+  it("registers the cache file and source dirs as build dependencies", async () => {
+    const root = makeRoot();
+    const compiler = makeCompiler(root);
+    const fileDependencies = new Set<string>();
+    const contextDependencies = new Set<string>();
+
+    webpackAlloy({ sourceDirs: ["src"] }).apply(compiler);
+    await compiler.hooks.thisCompilation.call({
+      fileDependencies,
+      contextDependencies,
+    });
+
+    expect(fileDependencies.has(webpackCachePath(root))).toBe(true);
+    expect(contextDependencies.has(path.join(root, "src"))).toBe(true);
+  });
+
+  it("appends to an array-form resolve.alias and updates an existing entry", async () => {
+    const root = makeRoot();
+
+    // New entry is pushed when none exists.
+    const fresh = makeCompiler(root);
+    fresh.options.resolve.alias = [];
+    webpackAlloy().apply(fresh);
+    expect(fresh.options.resolve.alias).toEqual([
+      { name: "virtual:alloy-container", alias: webpackCachePath(root) },
+    ]);
+
+    // An existing entry is updated in place rather than duplicated.
+    const existing = makeCompiler(root);
+    existing.options.resolve.alias = [
+      { name: "virtual:alloy-container", alias: "/stale/path.js" },
+    ];
+    webpackAlloy().apply(existing);
+    expect(existing.options.resolve.alias).toEqual([
+      { name: "virtual:alloy-container", alias: webpackCachePath(root) },
+    ]);
   });
 });
