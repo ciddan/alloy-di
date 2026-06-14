@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { dependenciesRegistry } from "../decorators";
-import { Container } from "../container";
-import { Lazy } from "../lazy";
-import type { Newable } from "../types";
+import { Container, dependenciesRegistry, Lazy } from "alloy-di/runtime";
+import type { Newable } from "alloy-di/runtime";
 import { applyAutoMocks, mockClass } from "./mocking";
 import type { MockOf } from "./mocking";
 
 type RegistryEntry = Parameters<(typeof dependenciesRegistry)["set"]>;
+
+const mockFn = () => vi.fn();
 
 describe("mockClass", () => {
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("mockClass", () => {
       nonFunction = "should not be copied";
     }
 
-    const { target, mock } = mockClass(ExampleService);
+    const { target, mock } = mockClass(ExampleService, mockFn);
 
     expect(target).toBe(ExampleService);
 
@@ -101,6 +101,7 @@ describe("applyAutoMocks", () => {
       target: Root,
       container,
       overridesCtors: new Set<Newable<unknown>>(),
+      mockFn,
     });
 
     expect(overrideSpy).toHaveBeenCalledTimes(2);
@@ -147,6 +148,7 @@ describe("applyAutoMocks", () => {
       target: Root,
       container,
       overridesCtors: overrides,
+      mockFn,
     });
 
     expect(overrideSpy).toHaveBeenCalledTimes(1);

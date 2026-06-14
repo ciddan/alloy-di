@@ -8,7 +8,7 @@ export {
   deps,
   assertDeps,
 } from "./lib/decorators";
-export { Lazy, LAZY_IDENTIFIER } from "./lib/lazy";
+export { Lazy, LAZY_IDENTIFIER, isLazy } from "./lib/lazy";
 export {
   registerServiceIdentifier,
   getServiceIdentifier,
@@ -16,8 +16,8 @@ export {
   clearServiceIdentifierRegistry,
 } from "./lib/service-identifiers";
 export type { ServiceIdentifier } from "./lib/service-identifiers";
-export type { Newable, Token } from "./lib/types";
-export { createToken } from "./lib/types";
+export type { Newable, Token, Constructor } from "./lib/types";
+export { createToken, isToken, isConstructor } from "./lib/types";
 export type { Lazy as LazyInterface } from "./lib/lazy";
 export {
   defineProviders,

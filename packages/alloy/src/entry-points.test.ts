@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import * as runtime from "./runtime";
 import * as vitePlugin from "./vite";
 import * as rollupPlugin from "./rollup";
-import * as testEntry from "./test";
 import * as generateEntry from "./generate";
 
 describe("Package Entry Points", () => {
@@ -33,13 +32,6 @@ describe("Package Entry Points", () => {
       expect(runtime.Lazy).toBeDefined();
       expect(runtime.createToken).toBeDefined();
       expect(runtime.defineProviders).toBeDefined();
-    });
-  });
-
-  describe("test", () => {
-    it("exports testing utilities", () => {
-      expect(testEntry.createTestContainer).toBeDefined();
-      expect(testEntry.createToken).toBeDefined();
     });
   });
 

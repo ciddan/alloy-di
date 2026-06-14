@@ -11,6 +11,10 @@ const external = [
   "vite",
   "vitest",
   "typescript",
+  // The deprecated `alloy-di/test` entry is a passthrough re-export of the
+  // Vitest adapter from the separate `@alloy-di/testing` package.
+  "@alloy-di/testing",
+  "@alloy-di/testing/vitest",
   "path",
   /^node:.*/,
   "node:url",

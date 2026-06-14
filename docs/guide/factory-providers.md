@@ -160,7 +160,7 @@ imperative helpers. A token value override still wins over a factory for the
 same token, so you can pin a concrete value without removing the factory.
 
 ```ts
-import { createTestContainer } from "alloy-di/test";
+import { createTestContainer } from "@alloy-di/testing/vitest";
 
 const t = createTestContainer({
   overrides: {

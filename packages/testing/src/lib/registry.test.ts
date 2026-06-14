@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { dependenciesRegistry } from "../decorators";
-import { Lazy } from "../lazy";
-import { createToken } from "../types";
+import { createToken, dependenciesRegistry, Lazy } from "alloy-di/runtime";
 import {
   getDirectDependencies,
   getRawDependencies,

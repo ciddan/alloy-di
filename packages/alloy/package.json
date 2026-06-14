@@ -81,11 +81,15 @@
     "rolldown-plugin-dts": "^0.25.2"
   },
   "peerDependencies": {
+    "@alloy-di/testing": "workspace:>=1.0.0",
     "typescript": ">=5.0.0",
     "vite": "^7.0.0 || ^8.0.0",
     "vitest": ">=4.0.14 <5.0.0"
   },
   "peerDependenciesMeta": {
+    "@alloy-di/testing": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     },
