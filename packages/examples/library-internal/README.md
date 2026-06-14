@@ -32,11 +32,11 @@ This library provides analytics and session tracking functionality with four mai
 
 ```typescript
 // rolldown.config.ts
-import { alloyManifest } from "alloy-di";
+import { alloy } from "alloy-di/rollup";
 
 export default defineConfig({
   input: { index: "src/index.ts" },
-  plugins: [alloyManifest()],
+  plugins: [alloy()],
 });
 ```
 
@@ -47,14 +47,13 @@ After building, this creates `dist/alloy.manifest.mjs` alongside the compiled co
 ```typescript
 // vite.config.ts
 import { defineConfig } from "vite";
-import alloy from "alloy-di";
+import alloy from "alloy-di/vite";
+import { manifest } from "@alloy-di/example-library-internal/manifest";
 
 export default defineConfig({
   plugins: [
     alloy({
-      manifests: [
-        "node_modules/@alloy-di/example-library-internal/dist/alloy.manifest.mjs",
-      ],
+      manifests: [manifest],
     }),
   ],
 });

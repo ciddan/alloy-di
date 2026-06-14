@@ -126,8 +126,10 @@ export const LoggerService = asLazyClass(
 Entire service module deferred via plugin config (`vite.config.ts`):
 
 ```typescript
+import { ReportingServiceIdentifier } from "@alloy-di/example-library-internal/service-identifiers";
+
 alloy({
-  lazyServices: ["ReportingService", "AnalyticsService"],
+  lazyServices: [ReportingServiceIdentifier],
 });
 ```
 
@@ -148,10 +150,10 @@ The app consumes services from `@alloy-di/example-library-internal` via manifest
 **Configuration** (`vite.config.ts`):
 
 ```typescript
+import { manifest } from "@alloy-di/example-library-internal/manifest";
+
 alloy({
-  manifests: [
-    "node_modules/@alloy-di/example-library-internal/dist/alloy.manifest.mjs",
-  ],
+  manifests: [manifest],
 });
 ```
 
@@ -249,6 +251,8 @@ The `vite.config.ts` demonstrates complete Alloy configuration:
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import alloy from "alloy-di/vite";
+import { manifest } from "@alloy-di/example-library-internal/manifest";
+import { ReportingServiceIdentifier } from "@alloy-di/example-library-internal/service-identifiers";
 
 export default defineConfig({
   plugins: [
@@ -258,12 +262,10 @@ export default defineConfig({
       providers: ["src/providers.ts"],
 
       // Manifests from internal monorepo libraries
-      manifests: [
-        "node_modules/@alloy-di/example-library-internal/dist/alloy.manifest.mjs",
-      ],
+      manifests: [manifest],
 
       // Services to load lazily at the factory level
-      lazyServices: ["ReportingService", "AnalyticsService"],
+      lazyServices: [ReportingServiceIdentifier],
     }),
   ],
 });
