@@ -6,17 +6,34 @@ export type { MockOf } from "./lib/testing/mocking";
 import type { Newable, Token } from "./lib/types";
 import type { ServiceIdentifier } from "./lib/service-identifiers";
 import { Container } from "./lib/container";
+import type { FactoryFn } from "./lib/container";
+import type { ServiceScope } from "./lib/scope";
 import { applyAutoMocks, type MockOf } from "./lib/testing/mocking";
 import { snapshotRegistry, restoreRegistry } from "./lib/testing/registry";
 import { vi } from "vitest";
 import type { ProviderDefinitions } from "./lib/providers";
 import { applyProviders } from "./lib/providers";
+import { createScope, type Scope } from "./scopes";
+
+export type FactoryOverrideSpec<T = unknown> = [
+  token: Token<T>,
+  factory: FactoryFn<T>,
+  options?: { lifecycle?: ServiceScope },
+];
+
+export type TestScopeHierarchy = Record<string, { parent?: ServiceScope }>;
 
 export interface OverrideSpec {
   /** Class constructor instance overrides */
   instances?: Array<[Newable<unknown>, unknown]>;
   /** Token value overrides */
   tokens?: Array<[Token<unknown>, unknown]>;
+  /**
+   * Token factory overrides. These are explicit token-keyed overrides and are
+   * not affected by autoMock, which only mocks class constructor dependencies.
+   * Token value overrides still take precedence for the same token.
+   */
+  factories?: FactoryOverrideSpec[];
 }
 
 export interface CreateTestContainerOptions {
@@ -24,6 +41,8 @@ export interface CreateTestContainerOptions {
   autoMock?: boolean;
   target?: Newable<unknown>; // focal service for auto-mocking immediate dependencies
   providers?: ProviderDefinitions | ProviderDefinitions[];
+  /** Custom scope hierarchy for tests, matching alloy({ scopes }) shape. */
+  scopes?: TestScopeHierarchy;
 }
 
 export interface TestContainerHandle {
@@ -34,6 +53,20 @@ export interface TestContainerHandle {
   getToken<T>(token: Token<T>): T;
   /** Provide a token value into the container */
   provideToken?<T>(token: Token<T>, value: T): void;
+  /** Provide a token factory into the container */
+  provideFactory?<T>(
+    token: Token<T>,
+    factory: FactoryFn<T>,
+    options?: { lifecycle?: ServiceScope },
+  ): void;
+  /** Alias for provideFactory when replacing an existing test factory. */
+  overrideFactory?<T>(
+    token: Token<T>,
+    factory: FactoryFn<T>,
+    options?: { lifecycle?: ServiceScope },
+  ): void;
+  /** Create a scope under the test container. */
+  createScope?(scopeName: ServiceScope): Scope;
   /** Placeholder restore hook (future phases may implement overlay stacks). */
   restore(): void;
   /** Retrieve a single class mock (if autoMock enabled). */
@@ -55,9 +88,20 @@ export interface TestContainerHandle {
   clearMockSpies?(): void;
 }
 
+function normalizeScopeHierarchy(
+  scopes: TestScopeHierarchy,
+): Record<string, string> {
+  const hierarchy: Record<string, string> = {};
+  for (const [scopeName, config] of Object.entries(scopes)) {
+    hierarchy[scopeName] = config.parent ?? "singleton";
+  }
+  return hierarchy;
+}
+
 /**
  * Create a test-focused container with manual overrides.
- * - Does not perform auto-mocking (Phase 2 will expand this).
+ * - Auto-mocking, when enabled, only mocks class constructor dependencies.
+ * - Token factories are explicit overrides and are applied after provider blocks.
  */
 export function createTestContainer(
   opts?: CreateTestContainerOptions | OverrideSpec,
@@ -71,13 +115,26 @@ export function createTestContainer(
       : never;
   };
   provideToken<T>(token: Token<T>, value: T): void;
+  provideFactory<T>(
+    token: Token<T>,
+    factory: FactoryFn<T>,
+    options?: { lifecycle?: ServiceScope },
+  ): void;
+  overrideFactory<T>(
+    token: Token<T>,
+    factory: FactoryFn<T>,
+    options?: { lifecycle?: ServiceScope },
+  ): void;
+  createScope(scopeName: ServiceScope): Scope;
 } {
   // Backward compatibility: allow passing OverrideSpec directly (Phase 1 style)
   const isLegacy =
     !!opts &&
     !("autoMock" in opts) &&
     !("target" in opts) &&
-    !("overrides" in opts);
+    !("overrides" in opts) &&
+    !("providers" in opts) &&
+    !("scopes" in opts);
   const normalizedOpts: CreateTestContainerOptions = isLegacy
     ? { overrides: opts as OverrideSpec }
     : (opts ?? {});
@@ -87,9 +144,22 @@ export function createTestContainer(
   // Take a snapshot of the registry before applying providers/overrides/mocks
   const snapshot = snapshotRegistry();
 
+  if (normalizedOpts.scopes) {
+    container._registerScopeHierarchy(
+      normalizeScopeHierarchy(normalizedOpts.scopes),
+    );
+  }
+
   // Apply providers block(s) if supplied
   if (normalizedOpts.providers) {
     applyProviders(container, normalizedOpts.providers);
+  }
+
+  // Apply factory overrides after providers so test factories replace
+  // declarative provider factories. Token value overrides still win at
+  // resolution time because value providers have container-level precedence.
+  for (const [tok, factory, options] of overrides?.factories ?? []) {
+    container.provideFactory(tok, factory, options);
   }
 
   // Apply token overrides first
@@ -132,6 +202,23 @@ export function createTestContainer(
     },
     provideToken: <T>(token: Token<T>, value: T): void => {
       container.provideValue(token, value);
+    },
+    provideFactory: <T>(
+      token: Token<T>,
+      factory: FactoryFn<T>,
+      options?: { lifecycle?: ServiceScope },
+    ): void => {
+      container.provideFactory(token, factory, options);
+    },
+    overrideFactory: <T>(
+      token: Token<T>,
+      factory: FactoryFn<T>,
+      options?: { lifecycle?: ServiceScope },
+    ): void => {
+      container.provideFactory(token, factory, options);
+    },
+    createScope: (scopeName: ServiceScope): Scope => {
+      return createScope(container, scopeName);
     },
     getMock: <T>(ctor: Newable<T>): MockOf<T> | undefined => {
       return (mocks?.get(ctor) as MockOf<T> | undefined) ?? undefined;
