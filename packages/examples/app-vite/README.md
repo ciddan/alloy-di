@@ -1,4 +1,4 @@
-# Alloy Example App
+# Alloy Vite Example App
 
 A React + Vite application demonstrating all major features of the Alloy dependency injection system.
 
@@ -226,19 +226,19 @@ Service resolution happens during Suspense boundary, enabling:
 **Development server:**
 
 ```bash
-pnpm dev
+pnpm --filter @alloy-di/example-app-vite dev
 ```
 
 **Build for production:**
 
 ```bash
-pnpm build
+pnpm --filter @alloy-di/example-app-vite build
 ```
 
 **Preview production build:**
 
 ```bash
-pnpm preview
+pnpm --filter @alloy-di/example-app-vite preview
 ```
 
 ## Configuration
@@ -248,7 +248,7 @@ The `vite.config.ts` demonstrates complete Alloy configuration:
 ```typescript
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import alloy from "alloy-di";
+import alloy from "alloy-di/vite";
 
 export default defineConfig({
   plugins: [

@@ -1,4 +1,4 @@
-# @alloy-di/example-app
+# @alloy-di/example-app-vite
 
 ## 0.0.9
 

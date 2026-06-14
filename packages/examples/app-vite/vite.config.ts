@@ -14,6 +14,9 @@ export default defineConfig(async () => {
       minify: false,
       sourcemap: true,
     },
+    define: {
+      __ALLOY_EXAMPLE_TARGET__: JSON.stringify("Vite"),
+    },
     plugins: [
       react(),
       alloy({

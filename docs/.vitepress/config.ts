@@ -69,6 +69,7 @@ export default defineConfig({
         items: [
           { text: "Overview", link: "/config/" },
           { text: "Vite Plugin", link: "/config/vite-plugin" },
+          { text: "Webpack / Rspack", link: "/config/bundler-plugins" },
           { text: "Rollup Plugin", link: "/config/rollup-plugin" },
         ],
       },

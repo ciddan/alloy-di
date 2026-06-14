@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { AlloyPluginOptions } from "./plugins/vite-plugin";
+import type { AlloyPluginOptions } from "./plugins/consumer-plugin";
 import {
   prepareContainerData,
   writeDeclarationArtifacts,

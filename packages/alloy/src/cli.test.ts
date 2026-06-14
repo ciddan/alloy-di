@@ -6,6 +6,7 @@ import {
   ALLOY_VITE_PLUGIN_OPTIONS,
   type AlloyPluginOptions,
 } from "./plugins/vite-plugin";
+import { ALLOY_PLUGIN_OPTIONS } from "./plugins/consumer-plugin";
 import {
   getAlloyOptions,
   parseGenerateArgs,
@@ -38,11 +39,23 @@ describe("alloy CLI", () => {
         "packages/app",
         "--config",
         "vite.config.ts",
+        "--bundler",
+        "webpack",
+        "--mode",
+        "development",
       ]),
     ).toEqual({
       root: "packages/app",
       configFile: "vite.config.ts",
+      bundler: "webpack",
+      mode: "development",
     });
+  });
+
+  it("rejects unknown bundlers", () => {
+    expect(() => parseGenerateArgs(["--bundler", "parcel"])).toThrow(
+      '[alloy] --bundler must be one of "vite", "webpack", "rspack", or "none".',
+    );
   });
 
   it("requires values for options that take values", () => {
@@ -56,6 +69,9 @@ describe("alloy CLI", () => {
     expect(getAlloyOptions({ [ALLOY_VITE_PLUGIN_OPTIONS]: alloyOptions })).toBe(
       alloyOptions,
     );
+    expect(getAlloyOptions({ [ALLOY_PLUGIN_OPTIONS]: alloyOptions })).toBe(
+      alloyOptions,
+    );
     expect(getAlloyOptions({ name: "other-plugin" })).toBeUndefined();
     expect(getAlloyOptions(null)).toBeUndefined();
   });
@@ -63,12 +79,76 @@ describe("alloy CLI", () => {
   it("resolves config-free generation options", async () => {
     await expect(
       resolveGenerateOptions({
-        root: "packages/examples/app",
+        root: "packages/examples/app-vite",
         configFile: "false",
       }),
     ).resolves.toEqual({
-      root: path.resolve("packages/examples/app"),
+      root: path.resolve("packages/examples/app-vite"),
     });
+  });
+
+  it("resolves webpack config plugin options", async () => {
+    const root = makeTmpRoot();
+    fs.writeFileSync(
+      path.join(root, "webpack.config.mjs"),
+      `
+        const options = { sourceDirs: ["app"] };
+        export default { plugins: [{ [Symbol.for("alloy-di.plugin-options")]: options }] };
+      `,
+    );
+
+    await expect(
+      resolveGenerateOptions({ root, bundler: "webpack" }),
+    ).resolves.toEqual({
+      root,
+      sourceDirs: ["app"],
+    });
+  });
+
+  it("resolves Rspack config functions and arrays", async () => {
+    const root = makeTmpRoot();
+    fs.writeFileSync(
+      path.join(root, "rspack.config.mjs"),
+      `
+        export default (_env, argv) => [
+          { plugins: [] },
+          {
+            plugins: [
+              { [Symbol.for("alloy-di.plugin-options")]: { sourceDirs: [argv.mode] } }
+            ]
+          }
+        ];
+      `,
+    );
+
+    await expect(
+      resolveGenerateOptions({
+        root,
+        bundler: "rspack",
+        mode: "development",
+      }),
+    ).resolves.toEqual({
+      root,
+      sourceDirs: ["development"],
+    });
+  });
+
+  it("rejects unsupported webpack TypeScript config loading", async () => {
+    const root = makeTmpRoot();
+    fs.writeFileSync(
+      path.join(root, "webpack.config.ts"),
+      "export default {};",
+    );
+
+    await expect(
+      resolveGenerateOptions({
+        root,
+        bundler: "webpack",
+        configFile: "webpack.config.ts",
+      }),
+    ).rejects.toThrow(
+      "webpack TypeScript config loading is not supported by alloy generate yet",
+    );
   });
 
   it("throws when resolved Vite config has no Alloy plugin", async () => {

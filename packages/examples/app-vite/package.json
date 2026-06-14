@@ -1,12 +1,12 @@
 {
-  "name": "@alloy-di/example-app",
+  "name": "@alloy-di/example-app-vite",
   "version": "0.0.9",
   "private": true,
   "license": "MIT",
   "author": "Mikael Selander",
   "type": "module",
   "scripts": {
-    "build": "alloy generate && tsc && vite build",
+    "build": "alloy generate --bundler vite && tsc && vite build",
     "dev": "vite",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

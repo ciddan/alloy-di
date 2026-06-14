@@ -1,0 +1,45 @@
+{
+  "name": "@alloy-di/example-app-webpack-rspack",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "author": "Mikael Selander",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm build:webpack && pnpm build:rspack",
+    "build:rspack": "alloy generate --bundler rspack --config rspack.config.mjs && tsc -b . --noEmit && rspack build --config rspack.config.mjs",
+    "build:webpack": "alloy generate --bundler webpack --config webpack.config.mjs && tsc -b . --noEmit && webpack --config webpack.config.mjs",
+    "dev:rspack": "alloy generate --bundler rspack --config rspack.config.mjs && rspack serve --config rspack.config.mjs",
+    "dev:webpack": "alloy generate --bundler webpack --config webpack.config.mjs && webpack serve --config webpack.config.mjs",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint --fix --type-aware --config ./.oxlintrc.json .",
+    "lint:check": "oxlint --type-aware --config ./.oxlintrc.json .",
+    "test": "echo No tests",
+    "test:cover": "echo No tests",
+    "typecheck": "alloy generate --bundler webpack --config webpack.config.mjs && tsc -b . --noEmit"
+  },
+  "dependencies": {
+    "@alloy-di/example-library-internal": "workspace:*"
+  },
+  "devDependencies": {
+    "@alloy-di/example-library-external": "workspace:*",
+    "@rspack/cli": "^1.5.8",
+    "@rspack/core": "^1.5.8",
+    "@swc/core": "^1.15.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "alloy-di": "workspace:*",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.5",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "sass": "^1.100.0",
+    "sass-loader": "^16.0.6",
+    "style-loader": "^4.0.0",
+    "swc-loader": "^0.2.6",
+    "webpack": "^5.107.2",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  }
+}

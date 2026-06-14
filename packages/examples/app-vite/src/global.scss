@@ -1,0 +1,74 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  --alloy-font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --alloy-font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --alloy-accent: #3b6ea5;
+  --alloy-accent-bright: #6daacf;
+  --alloy-c-blue: #6daacf;
+  --alloy-c-teal: #2dd4bf;
+  --alloy-c-amber: #fbbf24;
+  --alloy-c-violet: #b69cff;
+  --alloy-bg: #0d1117;
+  --alloy-bg-soft: #0a0e13;
+  --alloy-bg-elevated: #111820;
+  --alloy-code-bg: #131920;
+  --alloy-heading: #e8f0f7;
+  --alloy-text: #c8d8e4;
+  --alloy-muted: #8eafc2;
+  --alloy-dim: #82a0b3;
+  --alloy-faint: #4a6275;
+  --alloy-label: #6a8595;
+  --alloy-border: rgba(142, 175, 194, 0.12);
+  --alloy-border-strong: rgba(142, 175, 194, 0.25);
+  --alloy-accent-border: rgba(59, 110, 165, 0.35);
+  --alloy-grid-line: rgba(142, 175, 194, 0.08);
+  --alloy-cta-fill: #c8d8e4;
+  --alloy-cta-ink: #0d1117;
+
+  color: var(--alloy-text);
+  background: var(--alloy-bg);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--alloy-bg);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: clip;
+  background:
+    radial-gradient(
+      circle at 76% 12%,
+      rgba(59, 110, 165, 0.18),
+      transparent 34%
+    ),
+    var(--alloy-bg);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}

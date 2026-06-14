@@ -28,8 +28,8 @@ const features = [
   },
   {
     category: "compatibility",
-    title: "Framework agnostic",
-    desc: "Works with React, Vue, Svelte, or vanilla TypeScript. It's just a Vite plugin.",
+    title: "Bundler & Framework agnostic",
+    desc: "Use Alloy with Vite, webpack, or Rspack, and keep the same generated container across React, Vue, Svelte, or plain TypeScript apps.",
     icon: IconPuzzle,
   },
   {

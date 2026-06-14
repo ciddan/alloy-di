@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import * as runtime from "./runtime";
 import * as vitePlugin from "./vite";
+import * as webpackPlugin from "./webpack";
+import * as rspackPlugin from "./rspack";
 import * as rollupPlugin from "./rollup";
 import * as generateEntry from "./generate";
 
@@ -20,6 +22,24 @@ describe("Package Entry Points", () => {
       expect(typeof vitePlugin.alloy).toBe("function");
       expect(vitePlugin.default).toBeDefined();
       expect(vitePlugin.default).toBe(vitePlugin.alloy);
+    });
+  });
+
+  describe("webpack", () => {
+    it("exports alloy factory", () => {
+      expect(webpackPlugin.alloy).toBeDefined();
+      expect(typeof webpackPlugin.alloy).toBe("function");
+      expect(webpackPlugin.default).toBeDefined();
+      expect(webpackPlugin.default).toBe(webpackPlugin.alloy);
+    });
+  });
+
+  describe("rspack", () => {
+    it("exports alloy factory", () => {
+      expect(rspackPlugin.alloy).toBeDefined();
+      expect(typeof rspackPlugin.alloy).toBe("function");
+      expect(rspackPlugin.default).toBeDefined();
+      expect(rspackPlugin.default).toBe(rspackPlugin.alloy);
     });
   });
 

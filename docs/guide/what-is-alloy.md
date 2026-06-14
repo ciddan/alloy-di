@@ -1,6 +1,6 @@
 # What is Alloy?
 
-Alloy is a Vite plugin for **build-time dependency injection**.
+Alloy is a build-time dependency injection toolkit for TypeScript applications using Vite, webpack, or Rspack.
 
 It scans your code at build time to build a dependency graph and generates a DI container, which is then available to your application as a virtual module. This approach minimizes runtime overhead, avoids `reflect-metadata`, and provides a clean, declarative API for managing your services.
 
@@ -17,13 +17,13 @@ Alloy moves that work to **build time**. The plugin reads your `@Injectable` cla
 - **Type safety without magic.** Dependencies are declared as strongly-typed tuples and checked against constructors at compile time, and generated `ServiceIdentifier`s stay stable across minification and code-splitting.
 - **A visible graph.** Because the graph is known at build time, Alloy can emit a [Mermaid diagram](/guide/visualization) of your services.
 
-The trade-off is that Alloy is a **build-time tool**: it relies on the Vite (or Rollup) plugin and resolves asynchronously to support lazy imports. In exchange you get safety and bundle-awareness that runtime containers fundamentally can't offer.
+The trade-off is that Alloy is a **build-time tool**: it relies on a bundler plugin and resolves asynchronously to support lazy imports. In exchange you get safety and bundle-awareness that runtime containers fundamentally can't offer.
 
 ## High-Level Architecture
 
 ```mermaid
 graph TD
-  A["Source Files (.ts, .tsx)"] --> B["Vite Transform (plugin)"]
+  A["Source Files (.ts, .tsx)"] --> B["Bundler Plugin"]
   B -->|"scans for @Injectable"| C["Discovered Class Metadata Map"]
   C --> D["Virtual Module Loader"]
   D -->|"generates code"| E["virtual:alloy-container (Container instance)"]

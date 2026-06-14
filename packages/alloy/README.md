@@ -1,13 +1,13 @@
 # alloy-di
 
-`alloy-di` is a build-time dependency injection toolkit for Vite. It scans your TypeScript during build, generates a static container, and ships a tiny runtime so you get dependency injection without reflection overhead.
+`alloy-di` is a build-time dependency injection toolkit for TypeScript apps. It scans your TypeScript during build, generates a static container, and ships a tiny runtime so you get dependency injection without reflection overhead.
 
 ## Highlights
 
 - **Build-time graph** – services, scopes, and dependencies are resolved while bundling, so runtime work stays minimal.
-- **Visualize your DI graph** – enable the Vite plugin’s `visualize` option to emit a Mermaid diagram (`./alloy-di.mmd` by default) that captures scopes, lazy edges, and tokens for easy review.
+- **Visualize your DI graph** – enable the build plugin’s `visualize` option to emit a Mermaid diagram (`./alloy-di.mmd` by default) that captures scopes, lazy edges, and tokens for easy review.
 - **First-class lazy loading** – use `Lazy()` or provider-based lazy registrations to keep optional features in separate chunks.
-- **Framework agnostic** – works anywhere Vite runs: React, Vue, Svelte, SSR, libraries, and plain TS apps.
+- **Bundler support** – use the generated container from Vite, webpack, or Rspack applications.
 - **Type safe** – generates `serviceIdentifiers` and manifest declarations for precise inference.
 
 ## Install
@@ -55,11 +55,13 @@ pnpm add -D alloy-di
 
 By default Alloy scans `src` for decorated services. If your services live elsewhere, configure `sourceDirs` in the Vite plugin; `alloy generate` will reuse that config.
 
+Webpack and Rspack apps can use `alloy-di/webpack` or `alloy-di/rspack` with the same options. Run `alloy generate --bundler webpack` or `alloy generate --bundler rspack` before type-checking.
+
 Need manifests, providers, or testing utilities? See the docs site for complete guides.
 
 ## Visualize your dependency graph
 
-Enable the Vite plugin’s `visualize` option to have Alloy emit a Mermaid diagram that reflects every discovered service, scope, lazy edge, and token. By default the graph is written to `./alloy-di.mmd`, but you can customize the output path, color palette, or layout direction to fit your workflow.
+Enable the build plugin’s `visualize` option to have Alloy emit a Mermaid diagram that reflects every discovered service, scope, lazy edge, and token. By default the graph is written to `./alloy-di.mmd`, but you can customize the output path, color palette, or layout direction to fit your workflow.
 
 ```ts
 import { defineConfig } from "vite";
@@ -92,8 +94,9 @@ The site covers getting started, plugin options, manifest authoring, lazy loadin
 
 ## Examples in this repo
 
-- `packages/examples/app` – React + Vite app consuming decorated services, manifests, and providers.
+- `packages/examples/app-vite` – React + Vite app consuming decorated services, manifests, and providers.
+- `packages/examples/app-webpack-rspack` – the same React app source built with webpack and Rspack.
 - `packages/examples/library-internal` – monorepo library that emits `alloy.manifest.mjs` via the Rolldown plugin.
 - `packages/examples/library-external` – plain classes registered through providers.
 
-Clone the repo, run `pnpm install`, then `pnpm --filter @alloy-di/example-app dev` to explore.
+Clone the repo, run `pnpm install`, then `pnpm --filter @alloy-di/example-app-vite dev` to explore.

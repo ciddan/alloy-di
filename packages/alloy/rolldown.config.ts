@@ -32,6 +32,8 @@ export default defineConfig([
       cli: "src/cli.ts",
       generate: "src/generate.ts",
       vite: "src/vite.ts",
+      webpack: "src/webpack.ts",
+      rspack: "src/rspack.ts",
       rollup: "src/rollup.ts",
       runtime: "src/runtime.ts",
       scopes: "src/scopes.ts",

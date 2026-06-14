@@ -10,10 +10,11 @@ Please visit [alloy-di.dev](https://alloy-di.dev) for full documentation.
 
 # Alloy Monorepo
 
-A build-time dependency injection (DI) system purpose-built for the Vite ecosystem. This monorepo contains:
+A build-time dependency injection (DI) system for Vite, webpack, and Rspack applications. This monorepo contains:
 
-- **`packages/alloy`** – Vite plugin + minimal runtime. For detailed documentation on its API and features, please see the [package README](./packages/alloy/README.md).
-- **`packages/examples/app`** – Demonstrates service declaration, singleton vs transient scope, lazy/async dependency loading, and automatic code-splitting. For more details see the [app README](./packages/examples/app/README.md).
+- **`packages/alloy`** – Build plugins + minimal runtime. For detailed documentation on its API and features, please see the [package README](./packages/alloy/README.md).
+- **`packages/examples/app-vite`** – Demonstrates service declaration, singleton vs transient scope, lazy/async dependency loading, and automatic code-splitting with Vite. For more details see the [app README](./packages/examples/app-vite/README.md).
+- **`packages/examples/app-webpack-rspack`** – Builds the same React app source with webpack and Rspack configs.
 - **`packages/examples/library-internal`** – Example monorepo library using Alloy decorators directly, showing automatic service discovery. For more details see the [README](./packages/examples/library-internal/README.md).
 - **`packages/examples/library-external`** – Example external library with plain classes, showing provider-based integration. For more details see the [README](./packages/examples/library-external/README.md).
 
@@ -38,7 +39,7 @@ pnpm install
 - **Run the example app:**
 
   ```bash
-  pnpm --filter example dev
+  pnpm --filter @alloy-di/example-app-vite dev
   ```
 
 - **Run tests for the `alloy` library:**
