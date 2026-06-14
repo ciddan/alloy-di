@@ -361,8 +361,8 @@ function reconstructOptionsText(
     parts.push(`factory: ${expr}`);
   }
 
-  if (scope === "singleton") {
-    parts.push(`scope: 'singleton'`);
+  if (scope && scope !== "transient") {
+    parts.push(`scope: '${scope}'`);
   }
 
   if (dependencies && dependencies.length > 0) {
