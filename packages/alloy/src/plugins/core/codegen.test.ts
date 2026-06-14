@@ -397,6 +397,45 @@ describe("custom scope code generation", () => {
     expect(code).not.toContain("_registerScopeHierarchy");
   });
 
+  // Regression for issue #59 / PR #69: custom runtime scopes were dropped from
+  // the per-service meta block during codegen, silently degrading scoped
+  // services to transient behavior in the generated (built) container.
+  it("serializes a custom scope into the per-service meta block", () => {
+    const scoped = {
+      className: "SessionSvc",
+      filePath: "/src/session-svc.ts",
+      metadata: { scope: "session", dependencies: [] },
+    };
+    const code = generateContainerModule([scoped], new Set(), [], {
+      scopes: { session: { parent: "singleton" } },
+    });
+    expect(code).toContain("scope: 'session'");
+    expect(code).toContain("{ ctor: SessionSvc, meta: { scope: 'session' } }");
+  });
+
+  it("still serializes the built-in singleton scope", () => {
+    const singleton = {
+      className: "SingletonSvc",
+      filePath: "/src/singleton-svc.ts",
+      metadata: { scope: ServiceScope.SINGLETON, dependencies: [] },
+    };
+    const code = generateContainerModule([singleton], new Set(), []);
+    expect(code).toContain(
+      "{ ctor: SingletonSvc, meta: { scope: 'singleton' } }",
+    );
+  });
+
+  it("omits the default transient scope from the meta block", () => {
+    const transient = {
+      className: "TransientSvc",
+      filePath: "/src/transient-svc.ts",
+      metadata: { scope: ServiceScope.TRANSIENT, dependencies: [] },
+    };
+    const code = generateContainerModule([transient], new Set(), []);
+    expect(code).not.toContain("scope: 'transient'");
+    expect(code).toContain("{ ctor: TransientSvc, meta: {} }");
+  });
+
   it("emits the AlloyScopes augmentation as a standalone module file", () => {
     const dts = generateScopeAugmentationDefinition(["session", "request"]);
     expect(dts).toBeDefined();
