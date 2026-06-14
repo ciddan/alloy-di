@@ -3,6 +3,7 @@ import * as runtime from "./runtime";
 import * as vitePlugin from "./vite";
 import * as rollupPlugin from "./rollup";
 import * as testEntry from "./test";
+import * as generateEntry from "./generate";
 
 describe("Package Entry Points", () => {
   describe("rollup", () => {
@@ -39,6 +40,13 @@ describe("Package Entry Points", () => {
     it("exports testing utilities", () => {
       expect(testEntry.createTestContainer).toBeDefined();
       expect(testEntry.createToken).toBeDefined();
+    });
+  });
+
+  describe("generate", () => {
+    it("exports declaration generation API", () => {
+      expect(generateEntry.generate).toBeDefined();
+      expect(typeof generateEntry.generate).toBe("function");
     });
   });
 });

@@ -51,7 +51,9 @@ pnpm add -D alloy-di
    const app = await container.get(serviceIdentifiers.AppService);
    ```
 
-> **Build tip:** The default Vite scaffold (`pnpm create vite@latest`) wires `"build": "tsc && vite build"`. Alloy writes its ambient declarations during `vite build`, so running `tsc` first can fail on fresh trees. Swap the order (`vite build && tsc`), or manually run `vite build` to generate the declarations first.
+> **Build tip:** The default Vite scaffold (`pnpm create vite@latest`) wires `"build": "tsc && vite build"`. Run `alloy generate` before type-checking so fresh checkouts and CI have Alloy's ambient declarations available, for example `"build": "alloy generate && tsc && vite build"`.
+
+By default Alloy scans `src` for decorated services. If your services live elsewhere, configure `sourceDirs` in the Vite plugin; `alloy generate` will reuse that config.
 
 Need manifests, providers, or testing utilities? See the docs site for complete guides.
 

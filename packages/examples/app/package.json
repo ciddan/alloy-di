@@ -6,7 +6,7 @@
   "author": "Mikael Selander",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "alloy generate && tsc && vite build",
     "dev": "vite",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
