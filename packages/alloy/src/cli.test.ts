@@ -79,11 +79,11 @@ describe("alloy CLI", () => {
   it("resolves config-free generation options", async () => {
     await expect(
       resolveGenerateOptions({
-        root: "packages/examples/app",
+        root: "packages/examples/app-vite",
         configFile: "false",
       }),
     ).resolves.toEqual({
-      root: path.resolve("packages/examples/app"),
+      root: path.resolve("packages/examples/app-vite"),
     });
   });
 

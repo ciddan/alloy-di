@@ -48,8 +48,14 @@ alloy generate --bundler rspack
 
 - `virtual:alloy-container` is resolved to an Alloy-generated cache module under `node_modules/.cache/alloy-di`.
 - Configured `sourceDirs` are rescanned for each build/watch compilation.
-- Vite keeps its dedicated HMR path; webpack and Rspack prioritize rebuild correctness.
-- TypeScript bundler configs are not loaded directly by `alloy generate`. Use a JavaScript config wrapper or pass `--config false` and provide options programmatically through `alloy-di/generate`.
+- Provider files and configured source directories are added to the bundler watch graph where the compiler exposes those dependency sets.
+- Rebuilds regenerate the cache module before compilation, so imports from `virtual:alloy-container` see the latest discovered service graph.
+
+## Current Limitations
+
+- The webpack and Rspack adapters regenerate the container on rebuild; they do not hot-swap the DI graph inside a running page. If the service graph changes during development, refresh the browser after the rebuild completes.
+- `alloy generate` loads JavaScript bundler config files (`.js`, `.mjs`, `.cjs`). TypeScript webpack/Rspack configs need a JavaScript wrapper, or you can pass `--config false` and call `generate()` from `alloy-di/generate` with explicit options.
+- The adapters do not transpile TypeScript or styles. Keep using your bundler's normal loaders for `.ts`, `.tsx`, CSS, Sass, assets, and framework-specific transforms.
 
 ## CLI Options
 

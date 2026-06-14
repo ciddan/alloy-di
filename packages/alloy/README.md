@@ -94,8 +94,9 @@ The site covers getting started, plugin options, manifest authoring, lazy loadin
 
 ## Examples in this repo
 
-- `packages/examples/app` – React + Vite app consuming decorated services, manifests, and providers.
+- `packages/examples/app-vite` – React + Vite app consuming decorated services, manifests, and providers.
+- `packages/examples/app-webpack-rspack` – the same React app source built with webpack and Rspack.
 - `packages/examples/library-internal` – monorepo library that emits `alloy.manifest.mjs` via the Rolldown plugin.
 - `packages/examples/library-external` – plain classes registered through providers.
 
-Clone the repo, run `pnpm install`, then `pnpm --filter @alloy-di/example-app dev` to explore.
+Clone the repo, run `pnpm install`, then `pnpm --filter @alloy-di/example-app-vite dev` to explore.
