@@ -77,6 +77,7 @@ export default defineConfig({
         items: [
           { text: "Lazy Loading", link: "/guide/lazy-loading" },
           { text: "Hierarchical Scopes", link: "/guide/scopes" },
+          { text: "Factory Providers", link: "/guide/factory-providers" },
           { text: "Dependency Graph", link: "/guide/visualization" },
           { text: "Internal Libraries", link: "/guide/libraries" },
           { text: "Testing & Mocking", link: "/guide/testing" },

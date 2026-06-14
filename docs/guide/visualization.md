@@ -80,13 +80,24 @@ Each node is filled according to **how it's registered** in the container. The
 checks are applied in order, so a factory-backed or lazy-only service keeps its
 distinct color even if it also has a scope.
 
-| Fill       | Default   | Meaning                                               |
-| ---------- | --------- | ----------------------------------------------------- |
-| Steel-blue | `#3b6ea5` | **Singleton** service                                 |
-| Teal       | `#2a7d73` | **Transient** service                                 |
-| Violet     | `#6c5cb8` | **Lazy-only** service (reachable solely via `Lazy()`) |
-| Bronze     | `#9c6516` | **Factory**-provided service                          |
-| Slate      | `#4b5c6b` | **Token** — an identifier with no resolved provider   |
+| Fill       | Default   | Meaning                                                                                     |
+| ---------- | --------- | ------------------------------------------------------------------------------------------- |
+| Steel-blue | `#3b6ea5` | **Singleton** service                                                                       |
+| Teal       | `#2a7d73` | **Transient** service                                                                       |
+| Violet     | `#6c5cb8` | **Lazy-only** service (reachable solely via `Lazy()`)                                       |
+| Bronze     | `#9c6516` | **Factory** — a factory-lazy service or a [factory provider](/guide/factory-providers) node |
+| Slate      | `#4b5c6b` | **Token** — an identifier with no resolved provider                                         |
+
+#### Factory provider nodes
+
+A token bound to a [factory provider](/guide/factory-providers) (`asFactory` /
+`provideFactory`) renders as its own Bronze node labelled `Factory: <token>`,
+distinct from auto-discovered classes because the factory body is opaque to the
+scanner. A service that depends on a factory-bound token draws its edge to this
+node instead of a plain token node, and — because a factory carries a
+lifecycle — that edge is scope-stability checked: a longer-lived service
+depending on a shorter-lived scoped factory is flagged as a captive dependency,
+just as it would be for a class.
 
 ### Edges
 

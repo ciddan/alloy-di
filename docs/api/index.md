@@ -46,12 +46,13 @@ Use this when leveraging `lazyServices` or when consuming services discovered vi
 
 The testing entrypoint provides utilities for constructing a test-focused container and automocking dependencies.
 
-- `createTestContainer(options)`: Builds a container with optional `providers`, manual `overrides`, and `autoMock` targeting a specific `target` class.
+- `createTestContainer(options)`: Builds a container with optional `providers`, manual `overrides`, test `scopes`, and `autoMock` targeting a specific `target` class.
   - `providers?: ProviderDefinitions | ProviderDefinitions[]`
-  - `overrides?: { instances?: Array<[Newable, instance]>; tokens?: Array<[Token<T>, T]> }`
+  - `overrides?: { instances?: Array<[Newable, instance]>; tokens?: Array<[Token<T>, T]>; factories?: Array<[Token<T>, FactoryFn<T>, { lifecycle? }?]> }`
+  - `scopes?: Record<string, { parent?: ServiceScope }>` — same shape as `alloy({ scopes })`; omitted parents default to `"singleton"`.
   - `autoMock?: boolean`
   - `target?: Newable`
-  - Returns handle with `get`, `getToken`, `provideToken`, `getMock`, `getMocks`, `restore`.
+  - Returns handle with `get`, `getToken`, `provideToken`, `provideFactory`, `overrideFactory`, `createScope`, `getMock`, `getMocks`, `restore`.
 - `MockOf<T>`: Typed shape of an auto-generated mock with `spies` and `__target`.
 - `createToken(description?)`: Re-export for convenience in tests.
 
@@ -238,7 +239,30 @@ import { ApiBaseUrl } from "./tokens";
 container.provideValue(ApiBaseUrl, "https://api.example.com");
 ```
 
-Note: Factories are not supported yet. Provide concrete values via `provideValue`.
+### `container.provideFactory<T>(token, fn, options?): void`
+
+Binds a token to a **factory** — a function run at resolution time to produce
+the value. The factory receives the resolving context (so it can resolve its own
+dependencies via `get`/`getToken`) and may be `async`.
+
+```ts
+import container from "virtual:alloy-container";
+import { lifecycle } from "alloy-di/runtime";
+import { ApiClientToken, ConfigToken } from "./tokens";
+
+container.provideFactory(
+  ApiClientToken,
+  (c) => new ApiClient({ endpoint: c.getToken(ConfigToken).apiEndpoint }),
+  { lifecycle: lifecycle.singleton() },
+);
+```
+
+`options.lifecycle` accepts `singleton` (default — the result is cached on the
+root), `transient` (re-run on every resolution), or a custom scope (cached once
+per matching scope instance and disposed with it). Prefer the declarative
+`asFactory` provider below; `provideFactory` is the imperative escape hatch.
+
+See [Factory Providers](/guide/factory-providers) for the full guide.
 
 ### Using tokens in dependencies
 
@@ -264,6 +288,7 @@ Providers enable registering services and values without decorators, and they ar
 - `asValue(token, value)`: Bind a token to a concrete value.
 - `asClass(Class, { lifecycle, deps })`: Register a class with explicit lifecycle and optional dependencies.
 - `asLazyClass(importer, { lifecycle, deps, label })`: Define a lazily imported class; declare deps against its placeholder and optional display `label`.
+- `asFactory(token, fn, { lifecycle })`: Bind a token to a factory function run at resolution time. Collected under the `factories` field. See [Factory Providers](/guide/factory-providers).
 - `applyProviders(container, defs)`: Apply one or more provider blocks to a container.
 
 Example (library-side provider module):

@@ -1,6 +1,6 @@
 # Testing and Mocking with Alloy
 
-This guide covers the testing utilities exposed by `alloy-di/test` for use with Vitest, including manual overrides, provider application, automocking of dependencies, and lazy-loaded services.
+This guide covers the testing utilities exposed by `alloy-di/test` for use with Vitest, including manual overrides, provider application, factory overrides, custom scopes, automocking of dependencies, and lazy-loaded services.
 
 ## Prerequisites
 
@@ -17,8 +17,9 @@ Creates a container instance with optional overrides and automocking. Returns a 
 
 Options:
 
-- `overrides?: { instances?: Array<[Newable, instance]>; tokens?: Array<[Token<T>, T]> }`
+- `overrides?: { instances?: Array<[Newable, instance]>; tokens?: Array<[Token<T>, T]>; factories?: Array<[Token<T>, FactoryFn<T>, { lifecycle? }?]> }`
 - `providers?: ProviderDefinitions | ProviderDefinitions[]` — apply provider blocks to the container.
+- `scopes?: Record<string, { parent?: ServiceScope }>` — register a test-only custom scope hierarchy, matching the `alloy({ scopes })` shape.
 - `autoMock?: boolean` — enable automocking.
 - `target?: Newable` — the focal class whose dependency graph will be traversed for automocking.
 
@@ -27,6 +28,9 @@ Returned handle:
 - `get<T>(ctor: Newable<T>): Promise<T>` — resolve a class.
 - `getToken<T>(token: Token<T>): T` — retrieve a provided token value.
 - `provideToken<T>(token: Token<T>, value: T): void` — provide or update a token value.
+- `provideFactory<T>(token: Token<T>, factory: FactoryFn<T>, options?: { lifecycle?: ServiceScope }): void` — provide a token factory after construction.
+- `overrideFactory<T>(token: Token<T>, factory: FactoryFn<T>, options?: { lifecycle?: ServiceScope }): void` — alias for replacing a token factory after construction.
+- `createScope(scopeName: ServiceScope): Scope` — create a child scope under the test container.
 - `getMock<T>(ctor: Newable<T>): MockOf<T> | undefined` — get a specific class mock.
 - `getMocks<T extends readonly Newable[]>(ctors: T): [...]` — tuple-preserving batch mock retrieval.
 - `restore(): void` — restores the DI registry and any patched lazy importers; call this after each test.
@@ -64,6 +68,87 @@ const test = createTestContainer({
 
 const tracker = await test.get(EventTracker);
 ```
+
+## Factory Overrides
+
+Use `overrides.factories` when the production provider is a token-bound factory
+or when a test needs to construct a token value lazily. The tuple mirrors
+`container.provideFactory`: token, factory function, and optional lifecycle.
+
+```ts
+import { createTestContainer } from "alloy-di/test";
+import { lifecycle } from "alloy-di/runtime";
+import { ApiClientToken } from "./tokens";
+import { EventTracker } from "./event-tracker";
+
+const test = createTestContainer({
+  providers,
+  overrides: {
+    factories: [
+      [
+        ApiClientToken,
+        () => new FakeApiClient(),
+        { lifecycle: lifecycle.singleton() },
+      ],
+    ],
+  },
+});
+
+const tracker = await test.get(EventTracker);
+```
+
+Token value overrides still take precedence over factories for the same token,
+which is useful when you want to pin a concrete value without removing the
+factory registration. Factory overrides are explicit token-keyed overrides;
+`autoMock` only mocks class constructor dependencies.
+
+You can also provide or replace a factory after the test container is created:
+
+```ts
+const test = createTestContainer({ providers });
+
+test.provideFactory(ApiClientToken, () => new FakeApiClient());
+test.overrideFactory(ApiClientToken, () => new OtherFakeClient());
+```
+
+## Custom Scopes in Tests
+
+When code under test uses custom lifecycles, pass the same `scopes` block shape
+you use in `alloy({ scopes })`. Omitted parents default to `"singleton"`.
+
+```ts
+import { createTestContainer } from "alloy-di/test";
+import { CurrentUserToken, GreetingToken } from "./tokens";
+import { RequestConsumer } from "./request-consumer";
+
+const test = createTestContainer({
+  providers,
+  scopes: {
+    session: {},
+    request: { parent: "session" },
+  },
+  overrides: {
+    factories: [
+      [
+        GreetingToken,
+        (ctx) => `hello ${ctx.getToken(CurrentUserToken)}`,
+        { lifecycle: "request" },
+      ],
+    ],
+  },
+});
+
+const session = test.createScope("session");
+const request = session.createScope("request");
+request.provideValue(CurrentUserToken, "alice");
+
+const consumer = await request.get(RequestConsumer);
+```
+
+Scoped factory overrides cache on the matching test scope and can read
+scope-local token values through the factory context. Disposing the scope also
+disposes scoped factory results that implement `Symbol.dispose`,
+`Symbol.asyncDispose`, or `alloyOnDestroy`.
 
 ## Automocking Dependencies
 
@@ -145,5 +230,7 @@ See `packages/examples/library-internal/src` for examples:
 ## Notes
 
 - Automocking focuses on class dependencies. Tokens are skipped during mock traversal.
+- Factory overrides are token-keyed and explicit; `autoMock` does not replace them.
+- Test scopes use the same hierarchy shape as plugin scopes: `{ session: {}, request: { parent: "session" } }`.
 - `get` returns a Promise because services may be lazy-loaded.
 - Vitest must be installed in projects using `alloy-di/test`.

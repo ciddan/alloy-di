@@ -91,9 +91,7 @@ That single choice drives most of Alloy's advantages and most of its gaps.
    - **Multi-injection** (inject all implementations of a type),
      **named/tagged bindings**, and **contextual bindings** — entirely absent.
    - **Property / optional injection** — constructor-only today.
-   - **Runtime hierarchical scopes** — singleton + transient only (addressed by
-     the scopes proposal).
-   - **Factory providers and interceptors** — also proposals at present.
+   - **Interceptors / method AOP** — a design proposal at present.
 
 5. **Explicit, positional dependency declaration.** You keep `deps(...)` aligned
    with the constructor's parameter order. Metadata-based containers infer
@@ -122,7 +120,7 @@ differentiated and hard to replicate with a runtime container.
 - **Choose tsyringe / Awilix / Brandi / Ditox** when you want a small runtime
   container with synchronous resolution and zero build-step coupling.
 
-The active design proposals (hierarchical scopes, factory providers,
-interceptors) close the most conspicuous breadth gaps **without** surrendering
-the build-time-first identity — each validates or generates code at build time
-rather than bolting on runtime machinery.
+Recent additions (hierarchical scopes, factory providers) and the remaining
+interceptors proposal close the most conspicuous breadth gaps **without**
+surrendering the build-time-first identity — each validates or generates code at
+build time rather than bolting on runtime machinery.
