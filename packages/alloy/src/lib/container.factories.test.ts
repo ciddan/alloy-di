@@ -191,6 +191,26 @@ describe("Factory providers (container engine)", () => {
     );
   });
 
+  describe("re-registration", () => {
+    it("invalidates a cached singleton when the factory is re-registered", async () => {
+      const Token = createToken<number>("reregister-singleton");
+      const container = new Container();
+
+      @Injectable(deps(Token))
+      class Consumer {
+        constructor(public value: number) {}
+      }
+
+      container.provideFactory(Token, () => 1);
+      expect((await container.get(Consumer)).value).toBe(1);
+
+      // Re-registering replaces the descriptor; the previously cached value must
+      // not survive (it is tagged with the old generation).
+      container.provideFactory(Token, () => 2);
+      expect((await container.get(Consumer)).value).toBe(2);
+    });
+  });
+
   describe("getToken() interaction", () => {
     it("throws a factory-specific error when getToken hits a factory token", () => {
       const Token = createToken<string>("factory-via-getToken");

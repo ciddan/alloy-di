@@ -168,13 +168,14 @@ export function asClass<T extends Newable<unknown>>(
  * Create a factory provider: bind a token to a function executed at resolution
  * time. Mirrors `asClass` — a token, a factory function, and a lifecycle.
  *
- * The factory receives the container and may be async, so it can resolve its
- * own dependencies. `singleton` caches the result; `transient` re-runs on every
- * resolution.
+ * The factory receives the resolving context and may be async, so it can
+ * resolve its own dependencies. `singleton` caches the result on the root;
+ * `transient` re-runs on every resolution; a custom scope caches once per
+ * matching scope instance and disposes the result with it.
  *
  * @param token Token the produced value is bound to (its type checks `factory`'s return).
- * @param factory Function invoked with the container; may be async.
- * @param options.lifecycle Lifecycle scope (singleton or transient).
+ * @param factory Function invoked with the resolving context; may be async.
+ * @param options.lifecycle Lifecycle scope (singleton, transient, or a custom scope).
  */
 export function asFactory<T>(
   token: Token<T>,

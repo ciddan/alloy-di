@@ -2,7 +2,12 @@ import { Constructor, Newable, Token, isConstructor, isToken } from "./types";
 import { Lazy, isLazy } from "./lazy";
 import { dependenciesRegistry } from "./decorators";
 import { DependencyResolutionError } from "./dependency-error";
-import { ServiceScope, ResolutionContext } from "./scope";
+import {
+  ServiceScope,
+  ResolutionContext,
+  FactoryCacheEntry,
+  FactoryPendingEntry,
+} from "./scope";
 import {
   ServiceIdentifier,
   getConstructorByIdentifier,
@@ -16,19 +21,32 @@ type ServiceMetadata = {
   factory?: Lazy<Constructor>;
 };
 
+/**
+ * The container-like surface a factory receives. Both the root `Container` and
+ * a `Scope` satisfy it, so a factory can resolve its own dependencies against
+ * whichever context owns its lifecycle (root for `singleton`, the scope for a
+ * custom-scoped factory).
+ */
+export interface FactoryContext {
+  get<T>(target: Newable<T> | ServiceIdentifier<T>): Promise<T>;
+  getToken<T>(token: Token<T>): T;
+}
+
 /** A token-bound factory function executed at resolution time. */
-export type FactoryFn<T = unknown> = (container: Container) => T | Promise<T>;
+export type FactoryFn<T = unknown> = (
+  context: FactoryContext,
+) => T | Promise<T>;
 
 /**
- * Internal descriptor for a token-keyed factory provider. Mirrors the
- * singleton caching/coalescing model used for class instances, but keyed by
- * token id and stored inline on the descriptor:
- * - `singleton`: `fn` runs once; `value` is cached and reused. `pending`
- *   coalesces concurrent first-resolutions into a single execution.
- * - `transient`: `fn` runs on every resolution; cache/pending are unused.
+ * Internal descriptor for a token-keyed factory provider — the registration
+ * only. Cached results and in-flight promises live on the resolving
+ * `ResolutionContext` (root container for `singleton`, the matching scope for a
+ * custom lifecycle), so one registration can produce one instance per scope.
+ * `transient` caches nothing and re-runs on every resolution.
  *
- * `cached` is an explicit flag (not `value !== undefined`) so a factory that
- * legitimately resolves to `undefined` is still treated as cached.
+ * `generation` uniquely identifies this registration; re-registering a token
+ * mints a new descriptor with a higher generation, so cache entries tagged with
+ * the old generation become stale across the root and every active scope.
  *
  * `executing` backs a best-effort synchronous re-entrancy guard (see
  * `runFactory`); `description` is captured for clear cycle/error messages.
@@ -37,10 +55,8 @@ interface FactoryDescriptor<T = unknown> {
   fn: FactoryFn<T>;
   lifecycle: ServiceScope;
   description?: string;
-  cached: boolean;
+  generation: number;
   executing: boolean;
-  value?: T;
-  pending?: Promise<T>;
 }
 
 type DependencyClassification =
@@ -100,6 +116,13 @@ export class Container implements ResolutionContext {
   private readonly metadataCache = new Map<Constructor, ServiceMetadata>();
   private readonly valueProviders = new Map<symbol, unknown>();
   private readonly factoryRegistry = new Map<symbol, FactoryDescriptor>();
+  // Root-level cache for singleton factory results (mirrors `singletons` for
+  // classes); scoped factory results are cached on their `Scope` instead.
+  private readonly factoryValues = new Map<symbol, FactoryCacheEntry>();
+  private readonly factoryPending = new Map<symbol, FactoryPendingEntry>();
+  // Monotonic stamp handed to each factory registration so re-registration
+  // invalidates previously cached results everywhere they live.
+  private factoryGeneration = 0;
   private readonly factoryWarningCache = new WeakSet<Constructor>();
   private readonly scopeHierarchy = new Map<ServiceScope, ServiceScope>();
 
@@ -133,6 +156,37 @@ export class Container implements ResolutionContext {
 
   public hasProvider(tokenId: symbol): boolean {
     return this.valueProviders.has(tokenId);
+  }
+
+  public getFactoryValue(tokenId: symbol): FactoryCacheEntry | undefined {
+    return this.factoryValues.get(tokenId);
+  }
+
+  public setFactoryValue(
+    tokenId: symbol,
+    generation: number,
+    value: unknown,
+  ): void {
+    this.factoryValues.set(tokenId, { generation, value });
+  }
+
+  public getFactoryPending(tokenId: symbol): FactoryPendingEntry | undefined {
+    return this.factoryPending.get(tokenId);
+  }
+
+  public setFactoryPending(
+    tokenId: symbol,
+    generation: number,
+    promise: Promise<unknown>,
+  ): void {
+    this.factoryPending.set(tokenId, { generation, promise });
+  }
+
+  public deleteFactoryPending(tokenId: symbol, generation: number): void {
+    const current = this.factoryPending.get(tokenId);
+    if (current && current.generation === generation) {
+      this.factoryPending.delete(tokenId);
+    }
   }
 
   /**
@@ -250,9 +304,10 @@ export class Container implements ResolutionContext {
    * provider; prefer `asFactory` + `applyProviders` for static registration.
    *
    * @param token - The token created via `createToken`.
-   * @param fn - Factory invoked with the container; may be async.
-   * @param options.lifecycle - `singleton` (default, cached) or `transient`
-   *   (re-run on every resolution).
+   * @param fn - Factory invoked with the resolving context; may be async.
+   * @param options.lifecycle - `singleton` (default, cached on the root),
+   *   `transient` (re-run on every resolution), or a custom scope name (cached
+   *   once per matching scope instance and disposed with it).
    */
   public provideFactory<T>(
     token: Token<T>,
@@ -264,7 +319,7 @@ export class Container implements ResolutionContext {
       fn: fn as FactoryFn,
       lifecycle: options?.lifecycle ?? ServiceScope.SINGLETON,
       description: token.description,
-      cached: false,
+      generation: ++this.factoryGeneration,
       executing: false,
     });
   }
@@ -652,7 +707,7 @@ export class Container implements ResolutionContext {
 
     const factory = this.factoryRegistry.get(tok.id);
     if (factory) {
-      return this.resolveFactory(factory);
+      return this.resolveFactory(tok.id, factory, context);
     }
 
     const stackPath = this.formatStackPath(target, resolutionStack);
@@ -667,59 +722,97 @@ export class Container implements ResolutionContext {
   }
 
   /**
-   * Execute a token-bound factory according to its lifecycle.
+   * Execute a token-bound factory according to its lifecycle, caching its
+   * result on the context that owns that lifecycle:
    *
-   * - `transient`: run `fn` on every call; nothing is cached.
-   * - `singleton`: return the cached `value` once resolved; otherwise coalesce
-   *   concurrent first-resolutions onto a single `pending` promise (mirroring
-   *   `pendingSingletons` for classes). `pending` is cleared in `finally` so a
-   *   rejected factory can be retried rather than caching the failure.
+   * - `transient`: run `fn` on every call against the current context; nothing
+   *   is cached.
+   * - `singleton`: cache on the root container.
+   * - custom scope: cache on the nearest ancestor context whose `scopeName`
+   *   matches; if none is active, fall back to transient behaviour (mirrors how
+   *   class resolution treats a custom scope with no matching context).
    */
-  private resolveFactory(descriptor: FactoryDescriptor): unknown {
+  private resolveFactory(
+    tokenId: symbol,
+    descriptor: FactoryDescriptor,
+    context: ResolutionContext,
+  ): unknown {
     if (descriptor.lifecycle === ServiceScope.TRANSIENT) {
-      return this.runFactory(descriptor);
+      return this.runFactory(descriptor, context);
     }
 
-    if (descriptor.cached) {
-      return descriptor.value;
+    const targetCtx = this.findContextForScope(descriptor.lifecycle, context);
+
+    // Custom scope with no matching active context: behave like transient.
+    if (
+      descriptor.lifecycle !== ServiceScope.SINGLETON &&
+      targetCtx.scopeName !== descriptor.lifecycle
+    ) {
+      return this.runFactory(descriptor, context);
     }
 
-    if (descriptor.pending) {
-      return descriptor.pending;
+    return this.resolveFactoryCached(tokenId, descriptor, targetCtx);
+  }
+
+  /**
+   * Resolve a factory whose result is cached on `targetCtx`, keyed by token id.
+   * Mirrors `resolveCached` for classes: return the cached value, else coalesce
+   * concurrent first-resolutions onto a single `pending` promise, else run the
+   * factory and cache. `pending` is cleared in `finally` so a rejected factory
+   * can be retried rather than caching the failure.
+   */
+  private resolveFactoryCached(
+    tokenId: symbol,
+    descriptor: FactoryDescriptor,
+    targetCtx: ResolutionContext,
+  ): unknown {
+    const generation = descriptor.generation;
+
+    const cached = targetCtx.getFactoryValue(tokenId);
+    // A cached entry from an earlier registration (lower generation) is stale
+    // and falls through to re-run the current factory.
+    if (cached && cached.generation === generation) {
+      return cached.value;
+    }
+
+    const pending = targetCtx.getFactoryPending(tokenId);
+    if (pending && pending.generation === generation) {
+      return pending.promise;
     }
 
     const creation = (async () => {
       try {
-        const value = await this.runFactory(descriptor);
-        descriptor.value = value;
-        descriptor.cached = true;
+        const value = await this.runFactory(descriptor, targetCtx);
+        targetCtx.setFactoryValue(tokenId, generation, value);
         return value;
       } finally {
-        descriptor.pending = undefined;
+        targetCtx.deleteFactoryPending(tokenId, generation);
       }
     })();
 
-    descriptor.pending = creation;
+    targetCtx.setFactoryPending(tokenId, generation, creation);
     return creation;
   }
 
   /**
-   * Invoke a factory's function with a best-effort synchronous re-entrancy
-   * guard.
+   * Invoke a factory's function against the context that owns its lifecycle,
+   * with a best-effort synchronous re-entrancy guard.
    *
-   * `executing` is set only for the synchronous duration of `fn(this)` — long
+   * `executing` is set only for the synchronous duration of `fn(...)` — long
    * enough to catch a factory that resolves its own token before returning (a
    * synchronous self-cycle, or a synchronous mutual cycle between factories),
    * but cleared the moment `fn` returns so that concurrent resolutions which
-   * legitimately coalesce on an in-flight singleton (`pending`) are never
-   * mistaken for a cycle.
+   * legitimately coalesce on an in-flight result are never mistaken for a cycle.
    *
    * Known limitation: a factory that re-enters its own token *after* awaiting
    * (an async cross-await self-reference) is indistinguishable from valid
    * coalescing without async-context tracking, so that case is not caught here
    * — it is documented in the factory-providers guide.
    */
-  private runFactory(descriptor: FactoryDescriptor): unknown {
+  private runFactory(
+    descriptor: FactoryDescriptor,
+    context: ResolutionContext,
+  ): unknown {
     if (descriptor.executing) {
       const label = descriptor.description ?? "<token>";
       throw new Error(
@@ -728,7 +821,10 @@ export class Container implements ResolutionContext {
     }
     descriptor.executing = true;
     try {
-      return descriptor.fn(this);
+      // Every ResolutionContext in this system is the root Container or a Scope,
+      // both of which expose the `get`/`getToken` surface a factory needs.
+      // oxlint-disable-next-line no-unsafe-type-assertion -- justified above.
+      return descriptor.fn(context as unknown as FactoryContext);
     } finally {
       descriptor.executing = false;
     }

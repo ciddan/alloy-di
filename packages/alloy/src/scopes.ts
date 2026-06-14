@@ -1,5 +1,10 @@
 import type { Constructor, Newable, Token } from "./lib/types";
-import type { ServiceScope, ResolutionContext } from "./lib/scope";
+import type {
+  ServiceScope,
+  ResolutionContext,
+  FactoryCacheEntry,
+  FactoryPendingEntry,
+} from "./lib/scope";
 import type { Container } from "./lib/container";
 import type { ServiceIdentifier } from "./lib/service-identifiers";
 
@@ -11,6 +16,8 @@ export class Scope implements ResolutionContext {
   private readonly cached = new Map<Constructor, unknown>();
   private readonly pending = new Map<Constructor, Promise<unknown>>();
   private readonly valueProviders = new Map<symbol, unknown>();
+  private readonly factoryValues = new Map<symbol, FactoryCacheEntry>();
+  private readonly factoryPending = new Map<symbol, FactoryPendingEntry>();
   private readonly activeChildren = new Set<Scope>();
 
   // Track instantiation order for reverse disposal
@@ -72,6 +79,42 @@ export class Scope implements ResolutionContext {
       return true;
     }
     return this.parent.hasProvider(tokenId);
+  }
+
+  // Factory results are cached per-scope (a scoped factory produces one value
+  // per scope instance), tagged with the producing descriptor's generation. The
+  // resolved value is tracked for reverse-order disposal alongside class
+  // instances.
+  public getFactoryValue(tokenId: symbol): FactoryCacheEntry | undefined {
+    return this.factoryValues.get(tokenId);
+  }
+
+  public setFactoryValue(
+    tokenId: symbol,
+    generation: number,
+    value: unknown,
+  ): void {
+    this.factoryValues.set(tokenId, { generation, value });
+    this.instantiatedInstances.push(value);
+  }
+
+  public getFactoryPending(tokenId: symbol): FactoryPendingEntry | undefined {
+    return this.factoryPending.get(tokenId);
+  }
+
+  public setFactoryPending(
+    tokenId: symbol,
+    generation: number,
+    promise: Promise<unknown>,
+  ): void {
+    this.factoryPending.set(tokenId, { generation, promise });
+  }
+
+  public deleteFactoryPending(tokenId: symbol, generation: number): void {
+    const current = this.factoryPending.get(tokenId);
+    if (current && current.generation === generation) {
+      this.factoryPending.delete(tokenId);
+    }
   }
 
   // --- Public Container-like Interface ---
@@ -174,6 +217,8 @@ export class Scope implements ResolutionContext {
       this.cached.clear();
       this.pending.clear();
       this.valueProviders.clear();
+      this.factoryValues.clear();
+      this.factoryPending.clear();
 
       // Remove from parent's list of active child scopes
       if (this.parent instanceof Scope) {
