@@ -1,13 +1,15 @@
 # Plugin Architecture
 
-The Vite plugin is intentionally split across a few focused modules so it is easier to follow and to extend.
+The application build plugins are split across a shared consumer layer plus thin bundler adapters so Vite can keep its dev-server behavior while webpack/Rspack reuse the same discovery and codegen path.
 
 ## File layout
 
 ```
 packages/alloy/src/plugins/
+├── consumer-plugin.ts    # Shared app-plugin state (options, discovery, virtual container loading)
 ├── vite-plugin/
-│   └── index.ts          # Main Vite plugin entry point (discovery, manifest ingestion, provider imports)
+│   └── index.ts          # Vite adapter (hook filters, HMR invalidation)
+├── webpack-like-plugin.ts # Shared webpack/Rspack adapter implementation
 ├── core/
 │   ├── codegen.ts        # Generates virtual container module (imports, stubs, registrations, provider application)
 │   ├── scanner.ts        # Decorator + Lazy discovery via the TypeScript compiler AST
@@ -20,15 +22,26 @@ packages/alloy/src/plugins/
 
 ## Responsibilities
 
-### `vite-plugin/index.ts`
+### `consumer-plugin.ts`
 
-- Hosts the `alloy()` factory.
 - Keeps build-time state (`discoveredClasses`, file indexes, lazy reference indexes).
 - Drives the AST walk, deferring to helpers for decorator parsing and lazy tracking.
 - Generates the virtual module by delegating to `codegen.ts`.
 - Ingests internal library manifests, merging discovered services with manifest-described ones.
 - Imports provider modules (from config and manifests) and applies them in the generated container.
 - Throws a helpful error when duplicate service registrations are detected (same class name discovered locally and provided via manifest).
+
+### `vite-plugin/index.ts`
+
+- Hosts the Vite `alloy()` factory.
+- Preserves the object-hook filters used by Vite/Rolldown.
+- Keeps Vite's full-reload HMR path when the discovered service graph changes.
+
+### `webpack-like-plugin.ts`
+
+- Hosts the shared webpack/Rspack adapter implementation.
+- Resolves `virtual:alloy-container` to a generated cache module.
+- Rescans configured `sourceDirs` on compile/watch cycles and registers watch dependencies.
 
 ### `core/codegen.ts`
 
@@ -46,9 +59,9 @@ packages/alloy/src/plugins/
 
 ## Flow overview
 
-1. `alloy()` registers Vite hooks using the state holders in `vite-plugin/index.ts`.
-2. During `transform`, the scanner walks the TypeScript AST, records decorated classes, and forwards call expressions to `processLazyCall` from `core/lazy.ts`.
-3. When Vite requests the `virtual:alloy-container` module, the plugin passes the collected metadata + lazy-only set into `generateContainerModule()`.
+1. `alloy()` registers bundler hooks through the Vite, webpack, or Rspack adapter.
+2. The shared consumer context scans TypeScript ASTs, records decorated classes, and forwards call expressions to `processLazyCall` from `core/lazy.ts`.
+3. When the adapter needs `virtual:alloy-container`, the shared consumer context passes the collected metadata + lazy-only set into `generateContainerModule()`.
 4. The generated container imports only eagerly referenced services; lazy-only and factory-lazy (`lazyServices`) entries receive stubs plus `factory: Lazy(...)` metadata.
 5. Provider modules are imported and `applyProviders(container, ...)` is invoked after decorator-based registrations, enabling external libraries to register values, services, and lazy services.
 

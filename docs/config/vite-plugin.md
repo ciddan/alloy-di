@@ -113,6 +113,13 @@ By default the CLI loads your Vite config, finds the `alloy()` plugin, and reuse
 alloy generate --root packages/app --config vite.config.ts
 ```
 
+For webpack and Rspack projects, pass the matching bundler mode:
+
+```bash
+alloy generate --bundler webpack
+alloy generate --bundler rspack
+```
+
 Programmatic usage is available from `alloy-di/generate`:
 
 ```ts
