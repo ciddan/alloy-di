@@ -1,6 +1,6 @@
 {
   "name": "@alloy-di/testing",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Runner-neutral test-container utilities for Alloy DI, with Vitest, Jest, and node:test adapters",
   "keywords": [
     "dependency-injection",
@@ -83,7 +83,7 @@
   },
   "peerDependencies": {
     "@jest/globals": ">=29.0.0",
-    "alloy-di": ">=1.5.0",
+    "alloy-di": ">=2.0.0",
     "typescript": ">=5.0.0",
     "vitest": ">=4.0.14 <5.0.0"
   },
