@@ -85,12 +85,6 @@ export default defineConfig({
         ],
       },
       {
-        text: "Advanced",
-        items: [
-          { text: "Plugin Architecture", link: "/advanced/architecture" },
-        ],
-      },
-      {
         text: "Reference",
         items: [{ text: "API Surface", link: "/api/" }],
       },
