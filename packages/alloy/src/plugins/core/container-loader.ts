@@ -132,13 +132,15 @@ export async function prepareContainerData(
   reconcileLazySet(metas, lazyClassKeys, eagerReferencedNames);
   augmentFactoryLazyServices(metas, options.lazyServiceKeys);
 
-  // Scope-stability validation is opt-in: it runs only when custom scopes are
-  // declared. Projects without a `scopes` config keep today's behavior exactly
-  // (e.g. a singleton may freely depend on a transient).
+  // Scope-stability validation always runs. As of 2.0 the base rule applies to
+  // the built-in lifecycles too: a longer-lived service may not depend on a
+  // shorter-lived one, so a singleton may not depend on a transient (which it
+  // would capture and effectively leak). Declaring custom `scopes` extends the
+  // same rule across the full hierarchy.
   if (options.scopes && Object.keys(options.scopes).length > 0) {
     validateScopesConfig(options.scopes);
-    validateScopeStability(metas, options.scopes);
   }
+  validateScopeStability(metas, options.scopes);
 
   return {
     metas,
