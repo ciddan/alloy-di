@@ -162,8 +162,10 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  runCli().catch((error: unknown) => {
+  try {
+    await runCli();
+  } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-  });
+  }
 }

@@ -11,7 +11,7 @@ export const DEFAULT_SOURCE_DIRS = ["src"] as const;
 
 export function toLazyServiceKey(identifier: ServiceIdentifier): string {
   const description = identifier.description;
-  if (!description || !description.startsWith("alloy:")) {
+  if (!description?.startsWith("alloy:")) {
     throw new Error(
       "[alloy] lazyServices entries must be serviceIdentifiers exported by Alloy manifests.",
     );
