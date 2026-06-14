@@ -112,7 +112,7 @@ export class Scope implements ResolutionContext {
 
   public deleteFactoryPending(tokenId: symbol, generation: number): void {
     const current = this.factoryPending.get(tokenId);
-    if (current && current.generation === generation) {
+    if (current?.generation === generation) {
       this.factoryPending.delete(tokenId);
     }
   }

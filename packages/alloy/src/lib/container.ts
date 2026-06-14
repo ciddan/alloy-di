@@ -184,7 +184,7 @@ export class Container implements ResolutionContext {
 
   public deleteFactoryPending(tokenId: symbol, generation: number): void {
     const current = this.factoryPending.get(tokenId);
-    if (current && current.generation === generation) {
+    if (current?.generation === generation) {
       this.factoryPending.delete(tokenId);
     }
   }
@@ -315,8 +315,7 @@ export class Container implements ResolutionContext {
     options?: { lifecycle?: ServiceScope },
   ): void {
     this.factoryRegistry.set(token.id, {
-      // oxlint-disable-next-line no-unsafe-type-assertion -- descriptor is stored type-erased; the token's type guards the call site.
-      fn: fn as FactoryFn,
+      fn,
       lifecycle: options?.lifecycle ?? ServiceScope.SINGLETON,
       description: token.description,
       generation: ++this.factoryGeneration,
@@ -771,12 +770,12 @@ export class Container implements ResolutionContext {
     const cached = targetCtx.getFactoryValue(tokenId);
     // A cached entry from an earlier registration (lower generation) is stale
     // and falls through to re-run the current factory.
-    if (cached && cached.generation === generation) {
+    if (cached?.generation === generation) {
       return cached.value;
     }
 
     const pending = targetCtx.getFactoryPending(tokenId);
-    if (pending && pending.generation === generation) {
+    if (pending?.generation === generation) {
       return pending.promise;
     }
 
