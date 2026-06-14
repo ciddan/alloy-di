@@ -89,6 +89,9 @@ function AppContent() {
         `[Request Context] Logger initialized with ID: ${logger.requestId}`,
       );
       addLog(
+        `[Request Factory] API client: ${logger.describeApiRequest("/dashboard")}`,
+      );
+      addLog(
         `[Request Context] Injected SessionUser: ${sessionInfo?.username}`,
       );
 

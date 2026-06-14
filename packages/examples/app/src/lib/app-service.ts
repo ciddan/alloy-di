@@ -1,20 +1,23 @@
 import { deps, Injectable } from "alloy-di/runtime";
 import type { Logger } from "@alloy-di/example-library-external";
-import { ApiBaseUrl } from "./tokens";
+import type { ApiClient } from "./api-client";
+import { ApiClientToken } from "./tokens";
 import { ServiceA } from "./service-a";
 import { LoggerService } from "../providers";
 
-@Injectable(deps(ServiceA, ApiBaseUrl, LoggerService))
+@Injectable(deps(ServiceA, ApiClientToken, LoggerService))
 export class AppService {
   constructor(
     private serviceA: ServiceA,
-    private baseUrl: string,
+    private apiClient: ApiClient,
     private logger: Logger,
   ) {
-    this.logger.info("AppService initialized", { baseUrl: this.baseUrl });
+    this.logger.info("AppService initialized", {
+      baseUrl: this.apiClient.baseUrl,
+    });
   }
 
   public getValue() {
-    return `AppService gets: "${this.serviceA.value}" (baseUrl: ${this.baseUrl})`;
+    return `AppService gets: "${this.serviceA.value}" (api: ${this.apiClient.endpoint("/status")})`;
   }
 }

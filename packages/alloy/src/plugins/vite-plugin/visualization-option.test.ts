@@ -5,7 +5,7 @@ import type { ResolvedConfig } from "vite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { alloy } from "./index";
-import { applyTransform, loadContainer } from "./test-utils";
+import { applyBuildStart, applyTransform, loadContainer } from "./test-utils";
 
 describe("Vite Plugin Alloy - visualize option", () => {
   let tmpRoot: string | undefined;
@@ -69,5 +69,69 @@ describe("Vite Plugin Alloy - visualize option", () => {
     expect(diagram).toContain('["DepService"]');
     expect(diagram).toMatch(/-->\|Tr→Tr\|/);
     expect(diagram.trim().length).toBeGreaterThan(0);
+  });
+
+  it("includes factory provider nodes from configured provider modules", async () => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-vis-"));
+    const srcDir = path.join(tmpRoot, "src");
+    fs.mkdirSync(srcDir, { recursive: true });
+
+    const providerPath = path.join(srcDir, "providers.ts");
+    const servicePath = path.join(srcDir, "main.ts");
+    const diagramPath = path.join(tmpRoot, "factory-graph.mmd");
+
+    fs.writeFileSync(
+      providerPath,
+      `
+        import { asFactory, lifecycle } from 'alloy-di/runtime';
+        import { ApiClientToken } from './tokens';
+
+        export default {
+          factories: [
+            asFactory(ApiClientToken, () => ({}), {
+              lifecycle: lifecycle.singleton(),
+            }),
+          ],
+        };
+      `,
+    );
+    fs.writeFileSync(
+      servicePath,
+      `
+        import { Injectable, deps } from 'alloy-di/runtime';
+        import { ApiClientToken } from './tokens';
+
+        @Injectable(deps(ApiClientToken))
+        export class MainService {}
+      `,
+    );
+
+    const plugin = alloy({
+      providers: ["src/providers.ts"],
+      visualize: {
+        mermaid: {
+          outputPath: diagramPath,
+        },
+      },
+    });
+
+    const config: ResolvedConfig = { root: tmpRoot } as ResolvedConfig;
+    const configHook = plugin.configResolved;
+    if (typeof configHook === "function") {
+      await configHook.call({} as never, config);
+    } else if (configHook && typeof configHook.handler === "function") {
+      await configHook.handler.call({} as never, config);
+    }
+
+    applyBuildStart(plugin);
+
+    const generated = await loadContainer(plugin, "\0virtual:alloy-container");
+    expect(typeof generated).toBe("string");
+
+    const diagram = fs.readFileSync(diagramPath, "utf-8");
+    expect(diagram).toContain('["MainService"]');
+    expect(diagram).toContain('["Factory: ApiClientToken"]');
+    expect(diagram).toMatch(/MainService -->\|Tr→Si\| factory_/);
+    expect(diagram).not.toContain("token_ApiClientToken");
   });
 });

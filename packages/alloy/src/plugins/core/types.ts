@@ -36,6 +36,16 @@ export interface DiscoveredMeta {
   }[];
 }
 
+export interface FactoryProviderMeta {
+  filePath: string;
+  /** Source expression for the token passed to asFactory(...). */
+  tokenExpression: string;
+  /** Best-effort stable display label for the token. */
+  tokenLabel: string;
+  /** Factory lifecycle, defaulting to singleton when it cannot be inferred. */
+  lifecycle: BuildScope;
+}
+
 export interface ManifestTokenDependency {
   exportName: string;
   importPath: string;

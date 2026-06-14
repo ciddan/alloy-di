@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { generateMermaidDiagram } from "./visualizer";
-import type { BuildScope, DependencyDescriptor, DiscoveredMeta } from "./types";
+import type {
+  BuildScope,
+  DependencyDescriptor,
+  DiscoveredMeta,
+  FactoryProviderMeta,
+} from "./types";
 import { createClassKey } from "./utils";
 
 type ReferencedImport = NonNullable<
@@ -48,6 +53,25 @@ function createMeta({
       ...(factory ? { factory } : {}),
     },
     referencedImports,
+  };
+}
+
+function factoryProvider({
+  tokenLabel,
+  tokenExpression = tokenLabel,
+  lifecycle = "singleton",
+  filePath = "/src/providers.ts",
+}: {
+  tokenLabel: string;
+  tokenExpression?: string;
+  lifecycle?: BuildScope;
+  filePath?: string;
+}): FactoryProviderMeta {
+  return {
+    filePath,
+    tokenExpression,
+    tokenLabel,
+    lifecycle,
   };
 }
 
@@ -121,6 +145,57 @@ describe("generateMermaidDiagram", () => {
 
     expect(artifact.diagram).toContain("style id_LazyOnly fill:#6c5cb8");
     expect(artifact.diagram).toContain("style id_Factory fill:#9c6516");
+  });
+
+  it("renders token factory providers as distinct opaque factory nodes", () => {
+    const consumer = createMeta({
+      className: "Consumer",
+      filePath: "/src/consumer.ts",
+      scope: "singleton",
+      identifierKey: "id_Consumer",
+      dependencies: [dep("ApiClientToken", ["ApiClientToken"])],
+    });
+
+    const artifact = generateMermaidDiagram({
+      metas: [consumer],
+      factoryProviders: [
+        factoryProvider({
+          tokenLabel: "ApiClientToken",
+          lifecycle: "request",
+        }),
+      ],
+      scopes: {
+        request: { parent: "singleton" },
+      },
+    });
+
+    expect(artifact.nodeCount).toBe(2);
+    expect(artifact.tokenCount).toBe(0);
+    expect(artifact.factoryCount).toBe(1);
+    expect(artifact.diagram).toContain('["Factory: ApiClientToken"]');
+    expect(artifact.diagram).toContain("fill:#9c6516");
+    expect(artifact.diagram).toMatch(
+      /id_Consumer -->\|Si→Re ⚠️\| factory__src_providers_ts_ApiClientToken/,
+    );
+    expect(artifact.diagram).toContain("stroke:#ff4d4f");
+    expect(artifact.diagram).not.toContain("token_ApiClientToken");
+  });
+
+  it("renders unused factory providers without body dependency edges", () => {
+    const artifact = generateMermaidDiagram({
+      metas: [],
+      factoryProviders: [
+        factoryProvider({
+          tokenLabel: "UnusedToken",
+          tokenExpression: "UnusedToken",
+        }),
+      ],
+    });
+
+    expect(artifact.nodeCount).toBe(1);
+    expect(artifact.edgeCount).toBe(0);
+    expect(artifact.factoryCount).toBe(1);
+    expect(artifact.diagram).toContain('["Factory: UnusedToken"]');
   });
 
   it("resolves dependencies via import alias metadata", () => {

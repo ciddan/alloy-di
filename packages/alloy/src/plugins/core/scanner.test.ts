@@ -92,10 +92,119 @@ describe("scanner parse pre-filter (issue #22)", () => {
     ).toBe(true);
   });
 
+  it("accepts files containing asFactory provider references", () => {
+    expect(
+      mayContainDiscoverableSyntax(
+        `import { asFactory } from "alloy-di/runtime";\nexport default { factories: [asFactory(Token, () => 1, { lifecycle: "singleton" })] };\n`,
+      ),
+    ).toBe(true);
+  });
+
   it("returns an empty result for filtered files", () => {
     const result = scanSource(`export const value = 1;\n`, "/src/plain.ts");
     expect(result.metas).toHaveLength(0);
     expect(result.lazyClassKeys.size).toBe(0);
+    expect(result.factoryProviders).toHaveLength(0);
+  });
+
+  it("skips asFactory-only files when factory provider scanning is disabled", () => {
+    const result = scanSource(
+      `import { asFactory } from "alloy-di/runtime";\nasFactory(Token, () => 1);\n`,
+      "/src/providers.ts",
+      { factoryProviders: false },
+    );
+
+    expect(result.metas).toHaveLength(0);
+    expect(result.lazyClassKeys.size).toBe(0);
+    expect(result.factoryProviders).toHaveLength(0);
+  });
+});
+
+describe("scanner factory provider discovery", () => {
+  it("discovers token-bound factories imported from the runtime", () => {
+    const result = scanSource(
+      `
+        import { asFactory, lifecycle } from "alloy-di/runtime";
+        import { ApiClientToken } from "./tokens";
+
+        export default {
+          factories: [
+            asFactory(ApiClientToken, () => ({}), {
+              lifecycle: lifecycle.singleton(),
+            }),
+          ],
+        };
+      `,
+      "/src/providers.ts",
+    );
+
+    expect(result.metas).toHaveLength(0);
+    expect(result.factoryProviders).toEqual([
+      {
+        filePath: "/src/providers.ts",
+        tokenExpression: "ApiClientToken",
+        tokenLabel: "ApiClientToken",
+        lifecycle: "singleton",
+      },
+    ]);
+  });
+
+  it("supports aliased and namespace asFactory imports", () => {
+    const aliased = scanSource(
+      `
+        import { asFactory as makeFactory } from "alloy-di/runtime";
+        makeFactory(RequestToken, () => ({}), { lifecycle: "request" });
+      `,
+      "/src/aliased-providers.ts",
+    );
+    const namespaced = scanSource(
+      `
+        import * as Alloy from "alloy-di/runtime";
+        Alloy.asFactory(CacheToken, () => ({}), {
+          lifecycle: Alloy.lifecycle.transient(),
+        });
+      `,
+      "/src/namespaced-providers.ts",
+    );
+
+    expect(aliased.factoryProviders[0]).toMatchObject({
+      tokenLabel: "RequestToken",
+      lifecycle: "request",
+    });
+    expect(namespaced.factoryProviders[0]).toMatchObject({
+      tokenLabel: "CacheToken",
+      lifecycle: "transient",
+    });
+  });
+
+  it("defaults unknown factory lifecycle expressions to singleton", () => {
+    const result = scanSource(
+      `
+        import { asFactory } from "alloy-di/runtime";
+        const selectedLifecycle = computeLifecycle();
+        asFactory(DynamicToken, () => ({}), {
+          lifecycle: selectedLifecycle,
+        });
+      `,
+      "/src/dynamic-lifecycle-providers.ts",
+    );
+
+    expect(result.factoryProviders[0]).toMatchObject({
+      tokenLabel: "DynamicToken",
+      lifecycle: "singleton",
+    });
+  });
+
+  it("ignores unrelated asFactory calls", () => {
+    const result = scanSource(
+      `
+        import { asFactory } from "some-other-di";
+        asFactory(Token, () => ({}), { lifecycle: "singleton" });
+      `,
+      "/src/unrelated.ts",
+    );
+
+    expect(result.factoryProviders).toHaveLength(0);
   });
 });
 

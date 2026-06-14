@@ -344,7 +344,7 @@ export default defineProviders({
 ## FAQ
 
 **Q: Can I lazy-load a value provider?**  
-A: Values are typically small; wrap a factory returning a class instead if cost is high. Lazy value factories are not currently first-class.
+A: Values are typically small. If a value is expensive to construct, use a [factory provider](/guide/factory-providers) so it is computed on first resolution instead of at startup. Code-splitting a value itself behind a dynamic `import()` is not first-class — `Lazy()` code-splitting applies to classes.
 
 **Q: Do retries apply to provider placeholders?**  
 A: Yes. The underlying `Lazy` wrapper supports retry across both decorator and provider usages.

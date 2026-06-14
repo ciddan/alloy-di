@@ -24,9 +24,14 @@ export {
   asValue,
   asClass,
   asLazyClass,
+  asFactory,
   lifecycle,
   applyProviders,
 } from "./lib/providers";
-export type { ProviderDefinitions } from "./lib/providers";
+export type {
+  ProviderDefinitions,
+  FactoryProviderDescriptor,
+} from "./lib/providers";
+export type { FactoryFn } from "./lib/container";
 export { ServiceScope } from "./lib/scope";
 export type { AlloyScopes, ResolutionContext } from "./lib/scope";

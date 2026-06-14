@@ -7,7 +7,11 @@ import {
   generateManifestTypeDefinition,
   generateScopeAugmentationDefinition,
 } from "./codegen";
-import type { AlloyManifest, DiscoveredMeta } from "./types";
+import type {
+  AlloyManifest,
+  DiscoveredMeta,
+  FactoryProviderMeta,
+} from "./types";
 import { normalizeImportPath, writeFileIfChanged } from "./utils";
 import { IdentifierResolver } from "./identifier-resolver";
 import {
@@ -35,6 +39,7 @@ export interface LoadVirtualContainerOptions {
   lazyReferencedClassKeys: Set<string>;
   manifests: AlloyManifest[];
   providerImportPaths: string[];
+  factoryProviders: FactoryProviderMeta[];
   lazyServiceKeys: Set<string>;
   packageName: string;
   resolvedRoot: string;
@@ -110,6 +115,7 @@ export async function loadVirtualContainerModule(
   writeVisualizationArtifact(
     metas,
     lazyClassKeys,
+    options.factoryProviders,
     options.resolvedVisualization,
     options.scopes,
   );
@@ -243,6 +249,7 @@ function resolveDeclarationImportPath(
 function writeVisualizationArtifact(
   metas: DiscoveredMeta[],
   lazyReferencedClassKeys: Set<string>,
+  factoryProviders: FactoryProviderMeta[],
   resolvedVisualization: ResolvedVisualizationOptions | null,
   scopes: AlloyScopesConfig | undefined,
 ): void {
@@ -253,6 +260,7 @@ function writeVisualizationArtifact(
   const artifact = generateMermaidDiagram({
     metas,
     lazyClassKeys: new Set(lazyReferencedClassKeys),
+    factoryProviders,
     options: resolvedVisualization.mermaidOptions,
     scopes,
   });

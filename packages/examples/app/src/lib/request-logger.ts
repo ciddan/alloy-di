@@ -1,11 +1,16 @@
 import { deps, Injectable } from "alloy-di/runtime";
+import type { RequestApiClient } from "./api-client";
 import { SessionUser } from "./session-user";
+import { RequestApiClientToken } from "./tokens";
 
-@Injectable(deps(SessionUser), "request")
+@Injectable(deps(SessionUser, RequestApiClientToken), "request")
 export class RequestLogger {
   public readonly requestId = Math.random().toString(36).substring(7);
 
-  constructor(private user: SessionUser) {
+  constructor(
+    private user: SessionUser,
+    private requestApiClient: RequestApiClient,
+  ) {
     console.log(
       `[RequestLogger] Initialized request ${this.requestId} for user ${this.user.username}`,
     );
@@ -15,6 +20,10 @@ export class RequestLogger {
     console.log(
       `[RequestLogger - ${this.requestId}] [${this.user.username}] ${msg}`,
     );
+  }
+
+  public describeApiRequest(path: string) {
+    return this.requestApiClient.describeRequest(path);
   }
 
   public [Symbol.dispose]() {

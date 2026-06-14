@@ -197,11 +197,11 @@ already has.
 
 ## Relationship with Other Features
 
-- **[Hierarchical Scopes](./scopes.md)** — Interception happens at construction:
+- **Hierarchical Scopes** — Interception happens at construction:
   the container builds the wrapper subclass instead of the raw class. Whatever
   context caches the instance (root or a child scope) therefore caches the
   woven wrapper, so scoping and interception compose with no special handling.
-- **[Factory Providers](./factory-providers.md)** — Factory-produced values are
+- **Factory Providers** — Factory-produced values are
   built by an opaque function, not constructed by Alloy, so they are **not**
   woven. Interception targets discovered/decorated classes only; cross-cutting
   behaviour for a factory result belongs inside the factory.
