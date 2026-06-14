@@ -93,13 +93,11 @@ export function alloy(
     generateBundle(outputOptions: unknown) {
       const buildMode = getBuildMode(outputOptions);
 
-      // Scope-stability validation is opt-in: it runs only when custom scopes
-      // are declared, leaving non-scoped library builds unchanged.
       if (options.scopes && Object.keys(options.scopes).length > 0) {
         validateScopesConfig(options.scopes);
-        const allMetas = [...discovery.fileMetas.values()].flat();
-        validateScopeStability(allMetas, options.scopes);
       }
+      const allMetas = [...discovery.fileMetas.values()].flat();
+      validateScopeStability(allMetas, options.scopes);
 
       const services: ManifestServiceDescriptorV2[] = [];
       const missingExports: string[] = [];
