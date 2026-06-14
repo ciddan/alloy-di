@@ -51,9 +51,50 @@ export interface LoadVirtualContainerOptions {
   scopes?: AlloyScopesConfig;
 }
 
+export interface PreparedContainerData {
+  metas: DiscoveredMeta[];
+  lazyClassKeys: Set<string>;
+  providerImports: string[];
+  loadedManifests: Awaited<ReturnType<typeof readManifests>>["loadedManifests"];
+}
+
 export async function loadVirtualContainerModule(
   options: LoadVirtualContainerOptions,
 ): Promise<{ code: string; moduleType: "js" }> {
+  const prepared = await prepareContainerData(options);
+
+  const code = generateContainerModule(
+    prepared.metas,
+    prepared.lazyClassKeys,
+    prepared.providerImports,
+    {
+      isDev: options.isDevMode,
+      scopes: options.scopes,
+    },
+  );
+
+  writeDeclarationArtifacts({
+    metas: prepared.metas,
+    loadedManifests: prepared.loadedManifests,
+    resolvedRoot: options.resolvedRoot,
+    containerDeclarationDir: options.containerDeclarationDir,
+    scopes: options.scopes,
+  });
+
+  writeVisualizationArtifact(
+    prepared.metas,
+    prepared.lazyClassKeys,
+    options.factoryProviders,
+    options.resolvedVisualization,
+    options.scopes,
+  );
+
+  return { code, moduleType: "js" };
+}
+
+export async function prepareContainerData(
+  options: LoadVirtualContainerOptions,
+): Promise<PreparedContainerData> {
   const metas = options.localMetas.map((meta) => ({
     ...meta,
     metadata: { ...meta.metadata },
@@ -99,28 +140,12 @@ export async function loadVirtualContainerModule(
     validateScopeStability(metas, options.scopes);
   }
 
-  const code = generateContainerModule(metas, lazyClassKeys, providerImports, {
-    isDev: options.isDevMode,
-    scopes: options.scopes,
-  });
-
-  writeTypeDefinitions(
+  return {
     metas,
     loadedManifests,
-    options.resolvedRoot,
-    options.containerDeclarationDir,
-    options.scopes,
-  );
-
-  writeVisualizationArtifact(
-    metas,
     lazyClassKeys,
-    options.factoryProviders,
-    options.resolvedVisualization,
-    options.scopes,
-  );
-
-  return { code, moduleType: "js" };
+    providerImports,
+  };
 }
 
 function assignIdentifierKeys(
@@ -184,13 +209,19 @@ function assertNoDuplicateManifestServices(
   );
 }
 
-function writeTypeDefinitions(
-  metas: DiscoveredMeta[],
-  loadedManifests: Awaited<ReturnType<typeof readManifests>>["loadedManifests"],
-  resolvedRoot: string,
-  containerDeclarationDir: string | undefined,
-  scopes: AlloyScopesConfig | undefined,
+export interface WriteDeclarationArtifactsOptions {
+  metas: DiscoveredMeta[];
+  loadedManifests: Awaited<ReturnType<typeof readManifests>>["loadedManifests"];
+  resolvedRoot: string;
+  containerDeclarationDir?: string;
+  scopes?: AlloyScopesConfig;
+}
+
+export function writeDeclarationArtifacts(
+  options: WriteDeclarationArtifactsOptions,
 ): void {
+  const { metas, loadedManifests, resolvedRoot, containerDeclarationDir } =
+    options;
   const dtsDir = path.resolve(resolvedRoot, containerDeclarationDir ?? "./src");
   const dtsContent = generateContainerTypeDefinition(metas, (filePath) =>
     resolveDeclarationImportPath(dtsDir, filePath),
@@ -207,7 +238,7 @@ function writeTypeDefinitions(
   // script so `virtual:alloy-container` resolves everywhere.
   const scopeAugmentationPath = path.join(dtsDir, "alloy-scopes.d.ts");
   const scopeAugmentation = generateScopeAugmentationDefinition(
-    scopes ? Object.keys(scopes) : [],
+    options.scopes ? Object.keys(options.scopes) : [],
   );
   if (scopeAugmentation) {
     writeFileIfChanged(scopeAugmentationPath, scopeAugmentation);

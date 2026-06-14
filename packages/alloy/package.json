@@ -16,7 +16,11 @@
     "type": "git",
     "url": "https://github.com/ciddan/alloy-di/tree/main/packages/alloy"
   },
+  "bin": {
+    "alloy": "./bin/alloy.js"
+  },
   "files": [
+    "bin",
     "dist",
     "README.md"
   ],
@@ -25,6 +29,10 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./generate": {
+      "types": "./dist/generate.d.ts",
+      "import": "./dist/generate.js"
+    },
     "./runtime": {
       "types": "./dist/runtime.d.ts",
       "import": "./dist/runtime.js"

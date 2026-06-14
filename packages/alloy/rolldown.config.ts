@@ -29,6 +29,8 @@ export default defineConfig([
   // Bundle the main plugin and runtime code
   {
     input: {
+      cli: "src/cli.ts",
+      generate: "src/generate.ts",
       vite: "src/vite.ts",
       rollup: "src/rollup.ts",
       runtime: "src/runtime.ts",

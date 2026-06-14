@@ -84,6 +84,51 @@ These files provide TypeScript support for:
 
 Relative paths are resolved against the project root.
 
+### sourceDirs
+
+- **Type:** `string[]`
+- **Default:** `["src"]`
+
+Directories Alloy scans for decorated services before generating the virtual container and declaration files. Relative paths are resolved against the project root.
+
+Use this when your application code does not live under `src`, or when multiple source roots contribute services:
+
+```typescript
+alloy({
+  sourceDirs: ["app", "features"],
+});
+```
+
+## Declaration Generation
+
+The Vite plugin still writes declaration files during dev and build, but fresh checkouts and CI can generate them without bundling:
+
+```bash
+alloy generate
+```
+
+By default the CLI loads your Vite config, finds the `alloy()` plugin, and reuses its options. You can point at another root or config file:
+
+```bash
+alloy generate --root packages/app --config vite.config.ts
+```
+
+Programmatic usage is available from `alloy-di/generate`:
+
+```ts
+import { generate } from "alloy-di/generate";
+
+await generate({
+  root: process.cwd(),
+  sourceDirs: ["app"],
+  containerDeclarationDir: "src",
+  scopes: {
+    session: {},
+    request: { parent: "session" },
+  },
+});
+```
+
 ### scopes
 
 - **Type:** `Record<string, { parent: string }>`

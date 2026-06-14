@@ -3,7 +3,7 @@ import fs from "node:fs";
 import type { Plugin } from "vite";
 import type { ServiceIdentifier } from "../../lib/service-identifiers";
 import type { AlloyManifest } from "../core/types";
-import { normalizeImportPath, walkSync } from "../core/utils";
+import { normalizeImportPath } from "../core/utils";
 import { loadVirtualContainerModule } from "../core/container-loader";
 import type { AlloyScopesConfig } from "../core/scopes-validation";
 import {
@@ -20,10 +20,22 @@ import {
   createDiscoveryRuntime,
   isDiscoverableFile,
 } from "../core/discovery-runtime";
+import {
+  DEFAULT_SOURCE_DIRS,
+  readPackageName,
+  scanSourceDirectories,
+  toLazyServiceKey,
+} from "../core/generation-inputs";
 import { invalidateContainerModule } from "./module-invalidation";
 
 export interface AlloyPluginOptions {
   providers?: string[];
+  /**
+   * Source directories to scan for decorated services before the virtual
+   * container is loaded. Relative paths are resolved against the project root.
+   * Defaults to ["src"].
+   */
+  sourceDirs?: string[];
   /** Optional list of manifest objects to ingest */
   manifests?: AlloyManifest[];
   /** List of ServiceIdentifiers to mark as instantiation-lazy (adds factory Lazy wrapper) */
@@ -48,19 +60,17 @@ export interface AlloyPluginOptions {
   scopes?: AlloyScopesConfig;
 }
 
+export const ALLOY_VITE_PLUGIN_OPTIONS = Symbol.for(
+  "alloy-di.vite-plugin-options",
+);
+
+export interface AlloyVitePlugin extends Plugin {
+  [ALLOY_VITE_PLUGIN_OPTIONS]: AlloyPluginOptions;
+}
+
 interface ProviderModuleRef {
   absPath: string;
   importPath: string;
-}
-
-function toLazyServiceKey(identifier: ServiceIdentifier): string {
-  const description = identifier.description;
-  if (!description || !description.startsWith("alloy:")) {
-    throw new Error(
-      "[alloy] lazyServices entries must be serviceIdentifiers exported by Alloy manifests.",
-    );
-  }
-  return description;
 }
 
 /**
@@ -71,6 +81,9 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
   const virtualModuleId = "virtual:alloy-container";
   const resolvedVirtualModuleId = "\0" + virtualModuleId;
   const configuredProviderEntries = Array.from(options.providers ?? []);
+  const configuredSourceDirs = Array.from(
+    options.sourceDirs ?? DEFAULT_SOURCE_DIRS,
+  );
   const providerModuleRefs: ProviderModuleRef[] = [];
 
   let resolvedRoot = process.cwd();
@@ -86,22 +99,15 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
 
   const shouldTrackFactoryProviders = () => Boolean(resolvedVisualization);
 
-  return {
+  const plugin: AlloyVitePlugin = {
     name: "vite-plugin-alloy",
     enforce: "pre",
+    [ALLOY_VITE_PLUGIN_OPTIONS]: options,
 
     configResolved(config) {
       resolvedRoot = config.root ?? process.cwd();
       isDevMode = !config.isProduction;
-      try {
-        const pkgPath = path.resolve(resolvedRoot, "package.json");
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        if (typeof pkg.name === "string") {
-          packageName = pkg.name;
-        }
-      } catch {
-        // ignore
-      }
+      packageName = readPackageName(resolvedRoot);
 
       providerModuleRefs.length = 0;
       for (const entry of configuredProviderEntries) {
@@ -203,21 +209,13 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
         }
       }
 
-      // Pre-scan project files in src/ to ensure complete discovery before load()
-      const srcDir = path.join(resolvedRoot, "src");
-      const files = walkSync(srcDir);
-      for (const file of files) {
-        if (/\.(tsx?|ts)$/i.test(file) && !file.endsWith(".d.ts")) {
-          try {
-            const code = fs.readFileSync(file, "utf-8");
-            discoveryRuntime.processUpdate(file, code, {
-              factoryProviders: shouldTrackFactoryProviders(),
-            });
-          } catch {
-            // Ignore read errors
-          }
-        }
-      }
+      // Pre-scan configured source directories to ensure complete discovery before load()
+      scanSourceDirectories(
+        discoveryRuntime,
+        resolvedRoot,
+        configuredSourceDirs,
+        { factoryProviders: shouldTrackFactoryProviders() },
+      );
     },
 
     load: {
@@ -249,4 +247,6 @@ export function alloy(options: AlloyPluginOptions = {}): Plugin {
       },
     },
   };
+
+  return plugin;
 }

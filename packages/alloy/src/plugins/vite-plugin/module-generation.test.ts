@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 import { alloy } from "./index";
-import { applyTransform, loadContainer } from "./test-utils";
+import {
+  applyBuildStart,
+  applyConfigResolved,
+  applyTransform,
+  loadContainer,
+} from "./test-utils";
 import os from "node:os";
 import path from "path";
+import type { ResolvedConfig } from "vite";
 
 describe("Vite Plugin Alloy - module generation", () => {
   it("generates a module for a class with no dependencies", async () => {
@@ -53,6 +60,36 @@ describe("Vite Plugin Alloy - module generation", () => {
       "\0virtual:alloy-container",
     );
     expect(generatedCode).toMatchSnapshot();
+  });
+
+  it("pre-scans configured source directories", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "alloy-source-dirs-"));
+    try {
+      const appDir = path.join(root, "app");
+      fs.mkdirSync(appDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(appDir, "service.ts"),
+        `
+          import { Singleton } from 'alloy-di/runtime';
+          @Singleton()
+          export class AppService {}
+        `,
+      );
+
+      const plugin = alloy({ sourceDirs: ["app"] });
+      applyConfigResolved(plugin, { root } as ResolvedConfig);
+      applyBuildStart(plugin);
+
+      const generatedCode = (await loadContainer(
+        plugin,
+        "\0virtual:alloy-container",
+      )) as string;
+      expect(generatedCode).toContain(
+        `import { AppService } from '${path.join(root, "app/service.ts")}';`,
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("retains eagerly depended service even if also lazily referenced", async () => {
